@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0
 subdir-ccflags-$(CONFIG_POWER_SUPPLY_DEBUG) := -DDEBUG
+ccflags-$(CONFIG_TCPC_CLASS) += -I../../usb/typec/tcpc/inc
 
 power_supply-y				:= power_supply_core.o
 power_supply-$(CONFIG_SYSFS)		+= power_supply_sysfs.o
@@ -107,3 +108,4 @@ obj-$(CONFIG_BATTERY_SURFACE)	+= surface_battery.o
 obj-$(CONFIG_CHARGER_SURFACE)	+= surface_charger.o
 obj-$(CONFIG_QTI_BATTERY_CHARGER)	+= qti_battery_charger.o
 obj-$(CONFIG_QCOM_POWER_SUPPLY)	+= qcom/
+obj-$(CONFIG_CHARGER_MAX77729)	+= maxim/
