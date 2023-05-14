@@ -930,6 +930,14 @@ config LEDS_QPNP_VIBRATOR_LDO
 	  To compile this driver as a module, choose M here: the module
 	  will be called leds-qpnp-vibrator-ldo.
 
+config LEDS_QPNP_VIBRATOR_PWM
+	tristate "Vibrator-PWM support for QPNP PMIC"
+	depends on LEDS_CLASS && MFD_SPMI_PMIC
+	help
+	  This option enables device driver support for the vibrator-pwm
+	  peripheral found on Qualcomm Technologies, Inc. QPNP PMICs.
+	  The vibrator-pwm peripheral is capable of driving LAR vibrators.
+
 source "drivers/leds/blink/Kconfig"
 
 comment "Flash and Torch LED drivers"
