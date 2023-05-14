@@ -545,6 +545,7 @@ struct dwc3_msm {
 	u32			num_gsi_event_buffers;
 	struct dwc3_event_buffer **gsi_ev_buff;
 	int pm_qos_latency;
+	bool			perf_mode;
 	struct pm_qos_request pm_qos_req_dma;
 	struct delayed_work perf_vote_work;
 	struct mutex suspend_resume_mutex;
@@ -6181,6 +6182,9 @@ static int dwc3_msm_host_notifier(struct notifier_block *nb,
 static void msm_dwc3_perf_vote_update(struct dwc3_msm *mdwc, bool perf_mode)
 {
 	int latency = mdwc->pm_qos_latency;
+	struct dwc3 *dwc = platform_get_drvdata(mdwc->dwc3);
+
+	dwc->irq_cnt = 0;
 
 	if ((mdwc->perf_mode == perf_mode) || !latency)
 		return;
