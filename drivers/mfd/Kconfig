@@ -2241,3 +2241,4 @@ config MFD_RSMU_SPI
 
 endmenu
 endif
+source "drivers/mfd/maxim/Kconfig"
