@@ -10,3 +10,4 @@ obj-$(CONFIG_TYPEC_QCOM_PMIC)	+= qcom-pmic-typec.o
 obj-$(CONFIG_TYPEC_STUSB160X) 	+= stusb160x.o
 obj-$(CONFIG_TYPEC)		+= mux/
 obj-$(CONFIG_MUIC_MAX77729)	+= maxim/
+obj-$(CONFIG_TCPC_CLASS) 	+= tcpc/
