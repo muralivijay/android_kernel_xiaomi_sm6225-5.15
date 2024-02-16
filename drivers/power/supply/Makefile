@@ -109,3 +109,4 @@ obj-$(CONFIG_CHARGER_SURFACE)	+= surface_charger.o
 obj-$(CONFIG_QTI_BATTERY_CHARGER)	+= qti_battery_charger.o
 obj-$(CONFIG_QCOM_POWER_SUPPLY)	+= qcom/
 obj-$(CONFIG_CHARGER_MAX77729)	+= maxim/
+obj-$(CONFIG_NOPMI_CHARGER)     += battery_secret/
