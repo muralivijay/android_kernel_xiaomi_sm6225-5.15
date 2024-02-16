@@ -91,5 +91,5 @@ config TYPEC_QCOM_PMIC
 source "drivers/usb/typec/mux/Kconfig"
 
 source "drivers/usb/typec/altmodes/Kconfig"
-
+source "drivers/usb/typec/maxim/Kconfig"
 endif # TYPEC
