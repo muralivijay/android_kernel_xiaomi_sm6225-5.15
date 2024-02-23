@@ -212,6 +212,7 @@
 // for sm5602 fg
 #define PSY_IIO_FG_MONITOR_WORK			0xb0
 #define PSY_IIO_BATT_ID				0xb1
+#define PSY_IIO_DEV_CHIP_ID			0xab
 
 /* QNOVO5 */
 #define PSY_IIO_VOLTAGE_QNOVO       0x7e
