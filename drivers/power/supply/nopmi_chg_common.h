@@ -14,7 +14,7 @@
 #include <linux/of_irq.h>
 //#include <linux/pmic-voter.h>
 #include "nopmi/qcom-pmic-voter.h"
-//#include "maxim/max77729_charger.h"
+#include "maxim/max77729_charger.h"
 #include "../../usb/typec/tcpc/inc/tcpm.h"
 #include <linux/qti_power_supply.h>
 

@@ -13,7 +13,7 @@
 #include <linux/delay.h>
 #include <linux/workqueue.h>
 #include <linux/power_supply.h>
-//#include <linux/usb/typec/maxim/max77729_usbc.h>
+#include <linux/usb/typec/maxim/max77729_usbc.h>
 #include <../../usb/typec/tcpc/inc/tcpm.h>
 //#include <linux/pmic-voter.h>
 #include "nopmi/qcom-pmic-voter.h"

@@ -1,6 +1,6 @@
 #define pr_fmt(fmt) "nopmi_chg_common %s: " fmt, __func__
 
-//#include <linux/usb/typec/maxim/max77729_usbc.h>
+#include <linux/usb/typec/maxim/max77729_usbc.h>
 #include "nopmi_chg_common.h"
 #include "nopmi_chg_iio.h"
 #include "nopmi_chg.h"
@@ -10,8 +10,8 @@
 #include <linux/ipc_logging.h>
 #include <linux/printk.h>
 
-// static NOPMI_CHARGER_IC_TYPE nopmi_charger_ic = NOPMI_CHARGER_IC_NONE;
-//extern struct max77729_usbc_platform_data *g_usbc_data;
+static NOPMI_CHARGER_IC_TYPE nopmi_charger_ic = NOPMI_CHARGER_IC_NONE;
+extern struct max77729_usbc_platform_data *g_usbc_data;
 //extern int main_set_charge_enable(bool en);
 extern struct nopmi_chg *g_nopmi_chg;
 extern int adapter_dev_get_pd_verified(void);
@@ -214,9 +214,9 @@ int nopmi_get_quick_charge_type(struct power_supply *usb_psy)
 		is_single_flash = false;
 	}
 
-//	if (NOPMI_CHARGER_IC_MAXIM == nopmi_get_charger_ic_type())
-//		pd_verifed = g_usbc_data->verifed;
-//	else
+	if (NOPMI_CHARGER_IC_MAXIM == nopmi_get_charger_ic_type())
+		pd_verifed = g_usbc_data->verifed;
+	else
 	if (NOPMI_CHARGER_IC_SYV == nopmi_get_charger_ic_type())
 		pd_verifed = adapter_dev_get_pd_verified();
 	else

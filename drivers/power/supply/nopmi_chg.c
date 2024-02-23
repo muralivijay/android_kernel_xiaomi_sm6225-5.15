@@ -1325,7 +1325,7 @@ static int nopmi_batt_get_prop(struct power_supply *psy,
 
 	if(NOPMI_CHARGER_IC_MAXIM == nopmi_get_charger_ic_type())
 	{
-//		ret = max77729_batt_get_property(psy, psp, pval);
+		ret = max77729_batt_get_property(psy, psp, pval);
 	}
 	else
 	{
@@ -1379,7 +1379,7 @@ static int nopmi_batt_set_prop(struct power_supply *psy,
 
 	if(NOPMI_CHARGER_IC_MAXIM == nopmi_get_charger_ic_type())
 	{
-//		ret = max77729_batt_set_property(psy, prop, val);
+		ret = max77729_batt_set_property(psy, prop, val);
 	}
 	else
 	{
@@ -1416,8 +1416,8 @@ static int nopmi_batt_prop_is_writeable(struct power_supply *psy,
 {
 	if(NOPMI_CHARGER_IC_MAXIM == nopmi_get_charger_ic_type())
 	{
-		return -1;
-//0729		return batt_prop_is_writeable(psy, psp);
+//		return -1; //why error ?
+		return batt_prop_is_writeable(psy, psp);
 	}
 	else
 	{
@@ -1489,6 +1489,11 @@ static int nopmi_usb_get_prop(struct power_supply *psy,
 	union power_supply_propval value;
 	struct nopmi_chg *nopmi_chg = power_supply_get_drvdata(psy);
 	val->intval = 0;
+
+	if(NOPMI_CHARGER_IC_MAXIM == nopmi_get_charger_ic_type())
+	{
+		ret = max77729_usb_get_property(psy, psp, val);
+	}
 
 	//pr_info(" 20220819 %s psp=%d,val->intval=%d",__func__, psp, val->intval);
 	switch (psp) {
@@ -1575,6 +1580,11 @@ static int nopmi_usb_set_prop(struct power_supply *psy,
 	//longcheer nielianjie10 2022.10.13 add battery verify to limit charge current and modify battery verify logic
 	union power_supply_propval pval = {0, };
 	union power_supply_propval pval2 = {0, };
+
+	if(NOPMI_CHARGER_IC_MAXIM == nopmi_get_charger_ic_type())
+	{
+		ret = max77729_usb_set_property(psy, psp, val);
+	}
 
 	pr_info("psp=%d,val->intval=%d", psp, val->intval);
 	switch (psp) {
