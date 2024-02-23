@@ -403,7 +403,7 @@ static int qpnp_vibrator_pwm_probe(struct platform_device *pdev)
 {
 	struct vib_pwm_chip *chip;
 	int i, ret;
-	u32 base;
+	u32 base = 0;
 
 	printk("vib---wj---qpnp_vibrator_pwm_probe\n");
 
