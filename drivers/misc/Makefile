@@ -64,4 +64,3 @@ obj-$(CONFIG_OPEN_DICE)		+= open-dice.o
 obj-$(CONFIG_QSEECOM_PROXY) 	+= qseecom_proxy.o
 obj-$(CONFIG_ANT_CHECK)          += ant_check.o
 obj-$(CONFIG_ANT_CHECK_DIV)      += ant_check_div.o
-obj-$(CONFIG_TARGET_PROJECT_K7T) += board_id.o
