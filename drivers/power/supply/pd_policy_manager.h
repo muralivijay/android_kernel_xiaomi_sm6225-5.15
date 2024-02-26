@@ -151,6 +151,7 @@ struct cp_device {
     int  die_temp;
 };
 
+/*
 typedef struct _power_list {
         int accept;
         int max_voltage;
@@ -160,6 +161,7 @@ typedef struct _power_list {
         int comm_capable;
         int suspend;
  } POWER_LIST;
+*/
 
 #define PM_STATE_LOG_MAX    32
 struct usbpd_pm {
