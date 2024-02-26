@@ -17,6 +17,7 @@
 #include <linux/debugfs.h>
 #include <linux/seq_file.h>
 #include <linux/power_supply.h>
+#include <linux/qti_power_supply.h>
 #include "max77729_fuelgauge.h"
 
 /* extern unsigned int lpcharge; */

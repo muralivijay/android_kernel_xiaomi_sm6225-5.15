@@ -20,6 +20,7 @@
 #define __SEC_BATTERY_COMMON_H __FILE__
 
 #include <linux/power_supply.h>
+#include <linux/qti_power_supply.h>
 
 #define SEC_BATTERY_CABLE_UNKNOWN 0
 #define SEC_BATTERY_CABLE_NONE                  1

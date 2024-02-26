@@ -13,6 +13,7 @@
 #include <linux/debugfs.h>
 #include <linux/seq_file.h>
 #include <linux/power_supply.h>
+#include <linux/qti_power_supply.h>
 #include <linux/mfd/max77729.h>
 #include <linux/of_gpio.h>
 #include <linux/usb/typec/maxim/max77729-muic.h>

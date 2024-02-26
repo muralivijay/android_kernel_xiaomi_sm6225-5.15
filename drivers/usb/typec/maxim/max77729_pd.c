@@ -20,6 +20,7 @@
 #include <linux/interrupt.h>
 #include <linux/mod_devicetable.h>
 #include <linux/power_supply.h>
+#include <linux/qti_power_supply.h>
 #include <linux/of.h>
 #include <linux/irq.h>
 #include <linux/gpio.h>
