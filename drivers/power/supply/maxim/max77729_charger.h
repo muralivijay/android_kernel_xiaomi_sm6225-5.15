@@ -22,7 +22,8 @@
 #include <linux/regulator/machine.h>
 #include <linux/pm_wakeup.h>
 #include "linux/mfd/max77729_common.h"
-#include <linux/pmic-voter.h>
+//#include <linux/pmic-voter.h>
+#include "../nopmi/qcom-pmic-voter.h"
 
 enum sec_otg_attrs {
 	OTG_SEC_TYPE = 0,

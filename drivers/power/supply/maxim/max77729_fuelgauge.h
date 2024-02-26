@@ -21,7 +21,8 @@
 #include <linux/mfd/max77729-private.h>
 #include <linux/regulator/machine.h>
 #include <linux/pm_wakeup.h>
-#include <linux/pmic-voter.h>
+//#include <linux/pmic-voter.h>
+#include "../nopmi/qcom-pmic-voter.h"
 
 /* Client address should be shifted to the right 1bit.
  * R/W bit should NOT be included.
