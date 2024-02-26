@@ -1,7 +1,7 @@
 #define pr_fmt(fmt) "nopmi_chg %s: " fmt, __func__
 
 #include "nopmi_chg.h"
-#include "touch-charger.h"
+//#include "touch-charger.h"
 #include <linux/err.h>
 #include <linux/seq_file.h>
 #include <linux/debugfs.h>
