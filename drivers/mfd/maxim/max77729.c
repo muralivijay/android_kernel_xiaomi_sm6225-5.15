@@ -875,18 +875,18 @@ static int max77729_i2c_probe(struct i2c_client *i2c,
     //Brandon it should be modifed based on Xiaomi platform
 	/* max77729->muic = i2c_new_dummy(i2c->adapter, I2C_ADDR_MUIC); */
 
-	max77729->muic = i2c_new_dummy(i2c->adapter, I2C_ADDR_MUIC);
+	max77729->muic = i2c_new_dummy_device(i2c->adapter, I2C_ADDR_MUIC);
 	i2c_set_clientdata(max77729->muic, max77729);
 
-	max77729->charger = i2c_new_dummy(i2c->adapter, I2C_ADDR_CHG);
+	max77729->charger = i2c_new_dummy_device(i2c->adapter, I2C_ADDR_CHG);
 	i2c_set_clientdata(max77729->charger, max77729);
 
-	max77729->fuelgauge = i2c_new_dummy(i2c->adapter, I2C_ADDR_FG);
+	max77729->fuelgauge = i2c_new_dummy_device(i2c->adapter, I2C_ADDR_FG);
 	i2c_set_clientdata(max77729->fuelgauge, max77729);
 
 	max77729_usbc_fw_setting(max77729, 0);
 
-	max77729->debug = i2c_new_dummy(i2c->adapter, I2C_ADDR_DEBUG);
+	max77729->debug = i2c_new_dummy_device(i2c->adapter, I2C_ADDR_DEBUG);
 	i2c_set_clientdata(max77729->debug, max77729);
 	{
  	struct pinctrl *max_pinctrl = NULL;
