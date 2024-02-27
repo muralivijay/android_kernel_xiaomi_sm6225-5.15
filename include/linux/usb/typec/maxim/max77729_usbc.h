@@ -299,6 +299,7 @@ struct max77729_usbc_platform_data {
 	struct typec_partner *partner;
 	struct usb_pd_identity partner_identity;
 	struct typec_capability typec_cap;
+        struct typec_operations typec_ops; //use typec_ops Linux kernel version more than 5.4 for pr and dr set.
 	// struct completion typec_reverse_completion;
 	int typec_power_role;
 	int typec_data_role;

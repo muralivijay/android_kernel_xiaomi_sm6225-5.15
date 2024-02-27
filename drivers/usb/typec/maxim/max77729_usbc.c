@@ -12,6 +12,8 @@
  * GNU General Public License for more details.
  */
 
+#include <linux/version.h>
+#include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/uaccess.h>
 #include <linux/string.h>
@@ -427,9 +429,17 @@ void max77729_data_role_change(struct max77729_usbc_platform_data *usbpd_data, i
 	};
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
+static int max77729_pr_set(struct typec_port *port, enum typec_role role)
+#else
 static int max77729_pr_set(const struct typec_capability *cap, enum typec_role role)
+#endif
 {
+        #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
+	struct max77729_usbc_platform_data *usbpd_data = typec_get_drvdata(port);
+        #else
 	struct max77729_usbc_platform_data *usbpd_data = container_of(cap, struct max77729_usbc_platform_data, typec_cap);
+        #endif
 
 	if (!usbpd_data)
 		return -EINVAL;
@@ -464,11 +474,18 @@ static int max77729_pr_set(const struct typec_capability *cap, enum typec_role r
 	}
 	return 0;
 }
-
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
+static int max77729_dr_set(struct typec_port *port, enum typec_data_role role)
+#else
 static int max77729_dr_set(const struct typec_capability *cap, enum typec_data_role role)
+#endif
 {
-	/* struct max77729_usbc_platform_data *usbpd_data = g_usbc_data; */
+        /* struct max77729_usbc_platform_data *usbpd_data = g_usbc_data; */
+        #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
+	struct max77729_usbc_platform_data *usbpd_data = typec_get_drvdata(port);
+        #else
 	struct max77729_usbc_platform_data *usbpd_data = container_of(cap, struct max77729_usbc_platform_data, typec_cap);
+        #endif
 
     //need to add the proection code to check SINK or Source or No_connection.
     /*
@@ -1119,9 +1136,12 @@ static ssize_t max77729_fw_update(struct device *dev,
 		max77729_firmware_update_sysfs(g_usbc_data, 1);
 		break;
     case 17:
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
+        max77729_dr_set(g_usbc_data->port, TYPEC_HOST);
+#else
         max77729_dr_set(&g_usbc_data->typec_cap, TYPEC_HOST);
+#endif
         break;
-
 /*maxim test xiaomi adaptor case as below*/
 
     case 18:
@@ -1506,7 +1526,9 @@ static ssize_t current_pr_show(struct device *dev,
 
 	dev_err(dev, "%s: current_pr is %d\n", __func__, usbpd_data->typec_power_role);
 
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(5, 4, 0)
 	usbpd_data->typec_power_role;
+#endif
 
 	if (usbpd_data->typec_power_role == TYPEC_SINK)
 		pr = "sink";
@@ -3190,9 +3212,17 @@ static void delayed_external_notifier_init(struct work_struct *work)
 }
 #endif
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
+static int max77729_port_type_set(struct typec_port *port, enum typec_port_type port_type)
+#else
 static int max77729_port_type_set(const struct typec_capability *cap, enum typec_port_type port_type)
+#endif
 {
+        #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
+        struct max77729_usbc_platform_data *usbpd_data = typec_get_drvdata(port);
+        #else
 	struct max77729_usbc_platform_data *usbpd_data = container_of(cap, struct max77729_usbc_platform_data, typec_cap);
+        #endif
 
 	if (!usbpd_data)
 		return -EINVAL;
@@ -3330,9 +3360,15 @@ static int max77729_usbc_probe(struct platform_device *pdev)
 	usbc_data->typec_cap.pd_revision = 0x300;
 	usbc_data->typec_cap.prefer_role = TYPEC_NO_PREFERRED_ROLE;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
+        usbc_data->typec_ops.pr_set = max77729_pr_set;
+        usbc_data->typec_ops.dr_set = max77729_dr_set;
+        usbc_data->typec_ops.port_type_set = max77729_port_type_set;
+#else
 	usbc_data->typec_cap.pr_set = max77729_pr_set;
 	usbc_data->typec_cap.dr_set = max77729_dr_set;
 	usbc_data->typec_cap.port_type_set = max77729_port_type_set;
+#endif
 
 	usbc_data->typec_cap.type = TYPEC_PORT_DRP;
 	usbc_data->typec_cap.data = TYPEC_PORT_DRD;
