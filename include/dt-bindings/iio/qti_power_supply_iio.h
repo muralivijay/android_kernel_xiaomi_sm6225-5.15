@@ -205,6 +205,11 @@
 #define PSY_IIO_FASTCHARGE_MODE			0xa2
 #define PSY_IIO_BATTERY_TYPE			0xa3
 
+/*ln8000*/
+#define PSY_IIO_DEV_CHIP_ID                     0xab
+#define PSY_IIO_APDO_VOLT                       0xac
+#define PSY_IIO_APDO_CURR                       0xad
+
 // for NOPMI
 #define PSY_IIO_CHARGE_IC_TYPE			0xae
 #define PSY_IIO_FFC_DISABLE			0xaf
@@ -212,7 +217,6 @@
 // for sm5602 fg
 #define PSY_IIO_FG_MONITOR_WORK			0xb0
 #define PSY_IIO_BATT_ID				0xb1
-#define PSY_IIO_DEV_CHIP_ID			0xab
 
 /* QNOVO5 */
 #define PSY_IIO_VOLTAGE_QNOVO       0x7e
