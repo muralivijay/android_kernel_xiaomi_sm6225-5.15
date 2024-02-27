@@ -6181,9 +6181,6 @@ static int dwc3_msm_host_notifier(struct notifier_block *nb,
 static void msm_dwc3_perf_vote_update(struct dwc3_msm *mdwc, bool perf_mode)
 {
 	int latency = mdwc->pm_qos_latency;
-	struct dwc3 *dwc = platform_get_drvdata(mdwc->dwc3);
-
-	dwc->irq_cnt = 0;
 
 	if ((mdwc->perf_mode == perf_mode) || !latency)
 		return;
