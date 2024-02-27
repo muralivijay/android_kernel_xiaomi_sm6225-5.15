@@ -1017,7 +1017,6 @@ static int max77729_freeze(struct device *dev)
 {
 	struct i2c_client *i2c = container_of(dev, struct i2c_client, dev);
 	struct max77729_dev *max77729 = i2c_get_clientdata(i2c);
-	int i;
 
 	disable_irq(max77729->irq);
 
@@ -1028,7 +1027,6 @@ static int max77729_restore(struct device *dev)
 {
 	struct i2c_client *i2c = container_of(dev, struct i2c_client, dev);
 	struct max77729_dev *max77729 = i2c_get_clientdata(i2c);
-	int i;
 
 	enable_irq(max77729->irq);
 
