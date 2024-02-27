@@ -1123,7 +1123,7 @@ static ssize_t max77729_fw_update(struct device *dev,
 	struct device_attribute *attr, const char *buf, size_t size)
 {
 	unsigned int start_fw_update = 0;
-	unsigned char *test_buf;
+	unsigned char *test_buf = NULL;
 
 	if (kstrtou32(buf, 0, &start_fw_update)) {
 		dev_err(dev,
