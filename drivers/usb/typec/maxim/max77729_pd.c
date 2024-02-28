@@ -1201,8 +1201,10 @@ void start_usb_peripheral(void *data)
 	extcon_set_property(usbc_data->extcon, EXTCON_USB, EXTCON_PROP_USB_SS, val);
 
 	val.intval = usbc_data->cc_data->ccistat > CCI_500mA ? 1 : 0;
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 	extcon_set_property(usbc_data->extcon, EXTCON_USB,
 			EXTCON_PROP_USB_TYPEC_MED_HIGH_CURRENT, val);
+#endif
 
 	extcon_set_state_sync(usbc_data->extcon, EXTCON_USB, 1);
 }

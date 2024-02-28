@@ -11,6 +11,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+#include <linux/version.h>
+#include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/slab.h>
@@ -160,7 +162,9 @@ static irqreturn_t max77729_ccistat_irq(int irq, void *data)
 	pr_debug("%s: IRQ(%d)_OUT\n", __func__, irq);
 
 	eval.intval = cc_data->ccistat > CCI_500mA ? 1 : 0;
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 	extcon_set_property(usbc_data->extcon, EXTCON_USB, EXTCON_PROP_USB_TYPEC_MED_HIGH_CURRENT, eval);
+#endif
 	max77729_notify_rp_current_level(usbc_data);
 
 	return IRQ_HANDLED;

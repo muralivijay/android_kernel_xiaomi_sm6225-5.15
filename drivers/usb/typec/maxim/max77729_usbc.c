@@ -3496,8 +3496,10 @@ static int max77729_usbc_probe(struct platform_device *pdev)
 			EXTCON_PROP_USB_TYPEC_POLARITY);
 	extcon_set_property_capability(usbc_data->extcon, EXTCON_USB,
 			EXTCON_PROP_USB_SS);
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 	extcon_set_property_capability(usbc_data->extcon, EXTCON_USB,
 			EXTCON_PROP_USB_TYPEC_MED_HIGH_CURRENT);
+#endif
 	extcon_set_property_capability(usbc_data->extcon, EXTCON_USB_HOST,
 			EXTCON_PROP_USB_TYPEC_POLARITY);
 	extcon_set_property_capability(usbc_data->extcon, EXTCON_USB_HOST,
