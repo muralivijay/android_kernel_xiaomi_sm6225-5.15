@@ -29,6 +29,12 @@
 #include <linux/usb/typec/maxim/max77729_usbc.h>
 #include <linux/usb/typec/maxim/max77729_alternate.h>
 #include <linux/firmware.h>
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+#include <linux/qti_power_supply.h>
+#include <linux/iio/iio.h>
+#include <dt-bindings/iio/qti_power_supply_iio.h>
+#include <linux/iio/consumer.h>
+#endif
 
 #define DRIVER_VER		"1.0VER"
 
@@ -40,6 +46,47 @@
 #define MAX77729_IRQSRC_CHG	(1 << 0)
 #define MAX77729_IRQSRC_FG      (1 << 2)
 #define MAX77729_IRQSRC_MUIC	(1 << 3)
+
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+struct max77729_usb_data {
+	struct device *dev;
+	struct iio_channel **iio_channels;
+};
+
+enum iio_psy_property {
+	MAX77729_USB_REAL_TYPE,
+};
+
+static const char * const iio_channel_map[] = {
+        [MAX77729_USB_REAL_TYPE] = "real_type",
+};
+
+static bool is_max77729_chan_valid(struct max77729_usb_data *chip,
+		enum iio_psy_property chan)
+{
+	int rc;
+
+	if (IS_ERR(chip->iio_channels[chan]))
+		return false;
+
+	if (!chip->iio_channels[chan]) {
+		chip->iio_channels[chan] = iio_channel_get(chip->dev,
+					iio_channel_map[chan]);
+		if (IS_ERR(chip->iio_channels[chan])) {
+			rc = PTR_ERR(chip->iio_channels[chan]);
+			if (rc == -EPROBE_DEFER)
+				chip->iio_channels[chan] = NULL;
+
+			pr_err("Failed to get IIO channel %s, rc=%d\n",
+				iio_channel_map[chan], rc);
+			return false;
+		}
+	}
+
+	return true;
+}
+#endif
 
 static const unsigned int extcon_cable[] = {
 	EXTCON_USB,
@@ -2005,6 +2052,14 @@ void max77729_handle_qc_result(struct max77729_muic_data *muic_data, unsigned ch
 {
 	int result = data[1];
 	union power_supply_propval pvalue ={0,};
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+        struct max77729_usb_data *maxd = NULL;
+        int rc = 0;
+
+         if (!is_max77729_chan_valid(maxd, MAX77729_USB_REAL_TYPE)) {
+        pr_err("IIO channel not valid for MAX77729_USB_REAL_TYPE\n");
+    }
+#endif
 	pr_info("%s:%s result:0x%x vbadc:0x%x\n", MUIC_DEV_NAME,
 			__func__, data[1], data[2]);
 
@@ -2013,7 +2068,13 @@ void max77729_handle_qc_result(struct max77729_muic_data *muic_data, unsigned ch
 		pr_info("%s:%s QC2.0 Success\n", MUIC_DEV_NAME, __func__);
 		g_usbc_data->is_hvdcp = true;
 		pvalue.intval = QTI_POWER_SUPPLY_TYPE_USB_HVDCP;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+                if (!g_usbc_data->usb_psy)
+		       g_usbc_data->usb_psy = power_supply_get_by_name("usb");
+                rc = iio_write_channel_raw(maxd->iio_channels[MAX77729_USB_REAL_TYPE], pvalue.intval);
+#else
 		psy_do_property("usb", set, POWER_SUPPLY_PROP_REAL_TYPE, pvalue);
+#endif
 		break;
 	case 1:
 		pr_info("%s:%s No CHGIN\n", MUIC_DEV_NAME, __func__);
