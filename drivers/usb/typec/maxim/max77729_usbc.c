@@ -2012,7 +2012,7 @@ void max77729_handle_qc_result(struct max77729_muic_data *muic_data, unsigned ch
 	case 0:
 		pr_info("%s:%s QC2.0 Success\n", MUIC_DEV_NAME, __func__);
 		g_usbc_data->is_hvdcp = true;
-		pvalue.intval = POWER_SUPPLY_TYPE_USB_HVDCP;
+		pvalue.intval = QTI_POWER_SUPPLY_TYPE_USB_HVDCP;
 		psy_do_property("usb", set, POWER_SUPPLY_PROP_REAL_TYPE, pvalue);
 		break;
 	case 1:
