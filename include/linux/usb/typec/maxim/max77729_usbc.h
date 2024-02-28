@@ -15,7 +15,8 @@
 #ifndef __LINUX_MFD_MAX77729_UIC_H
 #define __LINUX_MFD_MAX77729_UIC_H
 #include <linux/usb/typec.h>
-#include <linux/pmic-voter.h>
+//#include <linux/pmic-voter.h>
+#include "../../../../../drivers/power/supply/nopmi/qcom-pmic-voter.h"
 #include <linux/extcon-provider.h>
 #define MAX77729_SYS_FW_UPDATE
 
