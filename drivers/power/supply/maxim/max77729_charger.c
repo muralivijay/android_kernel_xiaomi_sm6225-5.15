@@ -9,11 +9,15 @@
 #define pr_fmt(fmt)	"[MAX77729-chg] %s: " fmt, __func__
 #define DEBUG
 
+#include <linux/version.h>
+#include <linux/kernel.h>
 #include <linux/mfd/max77729-private.h>
 #include <linux/debugfs.h>
 #include <linux/seq_file.h>
 #include <linux/power_supply.h>
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(4, 19, 0))
 #include <linux/qti_power_supply.h>
+#endif
 #include <linux/mfd/max77729.h>
 #include <linux/of_gpio.h>
 #include <linux/usb/typec/maxim/max77729-muic.h>
@@ -94,9 +98,11 @@ static enum power_supply_property max77729_usb_props[] = {
 	POWER_SUPPLY_PROP_ONLINE,
 	POWER_SUPPLY_PROP_PRESENT,
 	POWER_SUPPLY_PROP_TYPE,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 	POWER_SUPPLY_PROP_REAL_TYPE,
 	POWER_SUPPLY_PROP_PD_ACTIVE,
 	POWER_SUPPLY_PROP_MTBF_CUR,
+#endif
 #if 0
 	POWER_SUPPLY_PROP_VOLTAGE_MAX,
 	POWER_SUPPLY_PROP_VOLTAGE_NOW,
@@ -129,9 +135,11 @@ static enum power_supply_property max77729_batt_props[] = {
 	POWER_SUPPLY_PROP_CHARGE_COUNTER,
 	POWER_SUPPLY_PROP_CYCLE_COUNT,
 #endif
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 	POWER_SUPPLY_PROP_SYSTEM_TEMP_LEVEL,
 	POWER_SUPPLY_PROP_BATTERY_CHARGING_ENABLED,
 	POWER_SUPPLY_PROP_INPUT_SUSPEND,
+#endif
 	POWER_SUPPLY_PROP_CHARGE_CONTROL_LIMIT,
 };
 #endif
@@ -2210,29 +2218,57 @@ int max77729_usb_get_property(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_TYPEC_MODE:
 
-		val->intval = POWER_SUPPLY_TYPEC_NONE;
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
+                val->intval = POWER_SUPPLY_TYPEC_NONE;
+#else
+		val->intval = QTI_POWER_SUPPLY_TYPEC_NONE;
+#endif
 		if (g_usbc_data) {
 			switch(g_usbc_data->cc_data->ccistat) {
 				case NOT_IN_UFP_MODE:
-					val->intval = POWER_SUPPLY_TYPEC_SINK;
+                  #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
+                                        val->intval = POWER_SUPPLY_TYPEC_SINK;
+                  #else
+					val->intval = QTI_POWER_SUPPLY_TYPEC_SINK;
+                  #endif
 					break;
 				case CCI_1_5A:
-					val->intval = POWER_SUPPLY_TYPEC_SOURCE_MEDIUM;
+                  #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
+                                        val->intval = POWER_SUPPLY_TYPEC_SOURCE_MEDIUM;
+                  #else
+					val->intval = QTI_POWER_SUPPLY_TYPEC_SOURCE_MEDIUM;
+                  #endif
 					break;
 				case CCI_3_0A:
-					val->intval = POWER_SUPPLY_TYPEC_SOURCE_HIGH;
+                  #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
+                                        val->intval = POWER_SUPPLY_TYPEC_SOURCE_HIGH;
+                  #else
+					val->intval = QTI_POWER_SUPPLY_TYPEC_SOURCE_HIGH;
+                  #endif
 					break;
 				case CCI_500mA:
-					val->intval = POWER_SUPPLY_TYPEC_SOURCE_DEFAULT;
+                  #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
+                                        val->intval = POWER_SUPPLY_TYPEC_SOURCE_DEFAULT;
+                  #else
+					val->intval = QTI_POWER_SUPPLY_TYPEC_SOURCE_DEFAULT;
+                  #endif
 				default:
 					break;
 			}
 			if (g_usbc_data->plug_attach_done){
 				if (g_usbc_data->acc_type == 1){
-					val->intval = POWER_SUPPLY_TYPEC_SINK_AUDIO_ADAPTER;
+                  #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
+                                        val->intval = POWER_SUPPLY_TYPEC_SINK_AUDIO_ADAPTER;
+                  #else
+					val->intval = QTI_POWER_SUPPLY_TYPEC_SINK_AUDIO_ADAPTER;
+                  #endif
 				}
 			} else {
-				val->intval = POWER_SUPPLY_TYPEC_NONE;
+                  #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
+                                val->intval = POWER_SUPPLY_TYPEC_NONE;
+                  #else
+				val->intval = QTI_POWER_SUPPLY_TYPEC_NONE;
+                  #endif
 			}
 		}
 
