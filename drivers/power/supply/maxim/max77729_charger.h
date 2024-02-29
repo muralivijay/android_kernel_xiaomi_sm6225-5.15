@@ -16,6 +16,8 @@
 #ifndef __MAX77729_CHARGER_H
 #define __MAX77729_CHARGER_H __FILE__
 
+#include <linux/version.h>
+#include <linux/kernel.h>
 #include <linux/mfd/core.h>
 #include <linux/mfd/max77729.h>
 #include <linux/mfd/max77729-private.h>
@@ -388,6 +390,15 @@ struct max77729_charger_data {
 	struct votable		*fv_votable;
 	struct votable      *chgctrl_votable;
 	/*add by xiaomi end*/
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(4, 19, 0))
+	struct iio_dev  *indio_dev;
+	struct iio_chan_spec    *iio_chan;
+	struct iio_channel      *int_iio_chans;
+	struct iio_channel	**ds_ext_iio_chans;
+	struct iio_channel	**max77729_chg_ext_iio_chans;
+	struct iio_channel	**fg_ext_iio_chans;
+	struct iio_channel	**main_iio;
+#endif
 
 	struct power_supply	*psy_chg;
 	struct power_supply	*psy_otg;
@@ -456,6 +467,16 @@ struct max77729_charger_data {
 };
 
 
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(4, 19, 0))
+enum max77729_charger_iio_type {
+	DS28E16,
+	MAX77729_CHG_BMS,
+	MAX77729_CHG_USB,
+	MAX77729_CHG_MAIN,
+};
+#endif
+
+
 int max77729_usb_get_property(struct power_supply *psy,
 		enum power_supply_property psp,
 		union power_supply_propval *val);
@@ -472,5 +493,10 @@ int max77729_batt_set_property(struct power_supply *psy,
 		const union power_supply_propval *val);
 int batt_prop_is_writeable(struct power_supply *psy,
 		enum power_supply_property psp);
-
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(4, 19, 0))
+int max77729_charger_get_iio_channel(struct max77729_charger_data *chg,
+			enum max77729_charger_iio_type type, int channel, int *val);
+int max77729_charger_set_iio_channel(struct max77729_charger_data *chg,
+			enum max77729_charger_iio_type type, int channel, int val);
+#endif
 #endif /* __MAX77729_CHARGER_H */

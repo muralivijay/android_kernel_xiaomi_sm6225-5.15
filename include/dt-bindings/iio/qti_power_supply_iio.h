@@ -205,6 +205,9 @@
 #define PSY_IIO_FASTCHARGE_MODE			0xa2
 #define PSY_IIO_BATTERY_TYPE			0xa3
 
+/* max77729 charger */
+#define PSY_IIO_BATTERY_CHARGING_ENABLED        0xa4
+
 /*ln8000*/
 #define PSY_IIO_DEV_CHIP_ID                     0xab
 #define PSY_IIO_APDO_VOLT                       0xac
