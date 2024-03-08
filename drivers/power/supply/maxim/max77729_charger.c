@@ -4443,6 +4443,34 @@ static int max77729_charger_init_iio_psy(struct max77729_charger_data *chip)
 
 	return rc;
 }
+
+static int max77729_charger_ext_init_iio_psy(struct max77729_charger_data *chip)
+{
+	if (!chip)
+		return -ENOMEM;
+
+	chip->fg_ext_iio_chans = devm_kcalloc(chip->dev,
+				ARRAY_SIZE(fg_ext_iio_chan_name), sizeof(*chip->fg_ext_iio_chans), GFP_KERNEL);
+	if (!chip->fg_ext_iio_chans)
+		return -ENOMEM;
+
+	chip->max77729_chg_ext_iio_chans = devm_kcalloc(chip->dev,
+		        ARRAY_SIZE(max77729_chg_ext_iio_chan_name), sizeof(*chip->max77729_chg_ext_iio_chans), GFP_KERNEL);
+	if (!chip->max77729_chg_ext_iio_chans)
+		return -ENOMEM;
+
+	chip->main_iio = devm_kcalloc(chip->dev,
+		        ARRAY_SIZE(main_iio_chan_name), sizeof(*chip->main_iio), GFP_KERNEL);
+	if (!chip->main_iio)
+		return -ENOMEM;
+
+	chip->ds_ext_iio_chans = devm_kcalloc(chip->dev,
+		        ARRAY_SIZE(ds_ext_iio_chan_name), sizeof(*chip->ds_ext_iio_chans), GFP_KERNEL);
+	if (!chip->ds_ext_iio_chans)
+		return -ENOMEM;
+
+	return 0;
+}
 #endif
 
 static int max77729_charger_probe(struct platform_device *pdev)
@@ -4543,6 +4571,12 @@ static int max77729_charger_probe(struct platform_device *pdev)
 
 	max77729_charger_initialize(charger);
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+	ret = max77729_charger_ext_init_iio_psy(charger);
+	if (ret < 0) {
+		pr_err("Failed to initialize max77729_charger ext IIO PSY, ret=%d\n", ret);
+        goto err_free;
+	}
+
 	ret = max77729_charger_init_iio_psy(charger);
 	if (ret < 0) {
 		pr_err("Failed to initialize max77729_charger IIO PSY, ret=%d\n", ret);
