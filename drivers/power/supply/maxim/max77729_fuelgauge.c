@@ -12,12 +12,16 @@
 #define DEBUG
 /* #define BATTERY_LOG_MESSAGE */
 
+#include <linux/version.h>
+#include <linux/kernel.h>
 #include <linux/mfd/max77729-private.h>
 #include <linux/of_gpio.h>
 #include <linux/debugfs.h>
 #include <linux/seq_file.h>
 #include <linux/power_supply.h>
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(5, 4, 0))
 #include <linux/qti_power_supply.h>
+#endif
 #include "max77729_fuelgauge.h"
 
 /* extern unsigned int lpcharge; */
@@ -35,24 +39,26 @@ static enum power_supply_property max77729_fuelgauge_props[] = {
 	POWER_SUPPLY_PROP_ENERGY_FULL,
 	POWER_SUPPLY_PROP_CHARGE_COUNTER,
 	POWER_SUPPLY_PROP_CYCLE_COUNT,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 	POWER_SUPPLY_PROP_RESISTANCE,
 	POWER_SUPPLY_PROP_RESISTANCE_ID,
 	POWER_SUPPLY_PROP_FASTCHARGE_MODE,
-	POWER_SUPPLY_PROP_CHARGE_FULL,
 	POWER_SUPPLY_PROP_SOH,
 	POWER_SUPPLY_PROP_SOC_DECIMAL,
 	POWER_SUPPLY_PROP_SOC_DECIMAL_RATE,
- #ifdef CONFIG_BATT_VERIFY_BY_DS28E16
+        POWER_SUPPLY_PROP_BATTERY_TYPE,
+        POWER_SUPPLY_PROP_SHUTDOWN_DELAY,
+#endif
+#ifdef CONFIG_BATT_VERIFY_BY_DS28E16
 	POWER_SUPPLY_PROP_AUTHENTIC,
 	POWER_SUPPLY_PROP_ROMID,
 	POWER_SUPPLY_PROP_DS_STATUS,
 	POWER_SUPPLY_PROP_PAGE0_DATA,
 	POWER_SUPPLY_PROP_CHIP_OK,
 #endif
+        POWER_SUPPLY_PROP_CHARGE_FULL,
 	POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN,
 	POWER_SUPPLY_PROP_TECHNOLOGY,
-	POWER_SUPPLY_PROP_BATTERY_TYPE,
-	POWER_SUPPLY_PROP_SHUTDOWN_DELAY,
 };
 
 int max77729_fuelgauge_prop_is_writeable(struct power_supply *psy,
@@ -60,7 +66,9 @@ int max77729_fuelgauge_prop_is_writeable(struct power_supply *psy,
 {
 	switch (psp) {
 	case POWER_SUPPLY_PROP_ONLINE:
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 	case POWER_SUPPLY_PROP_FASTCHARGE_MODE:
+#endif
 	case POWER_SUPPLY_PROP_TEMP:
 		return 1;
 	default:
@@ -73,7 +81,9 @@ bool max77729_fg_fuelalert_init(struct max77729_fuelgauge_data *fuelgauge,
 				int soc, int volt);
 static void max77729_fg_periodic_read_power(
 				struct max77729_fuelgauge_data *fuelgauge);
-static u8 fgauge_get_battery_id(void);
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
+static u8 fgauge_get_battery_id(void); //code debug by muralivijay
+#endif
 
 static struct device_attribute max77729_fg_attrs[] = {
 	MAX77729_FG_ATTR(fg_data),
@@ -1022,6 +1032,9 @@ static int max77729_fg_read_vsys(struct max77729_fuelgauge_data *fuelgauge)
 	return vsys;
 }
 
+// enable it after create iio_channel
+// code debug by muralivijay
+#if 0
 static int max77729_fg_read_SoH(struct max77729_fuelgauge_data *fuelgauge)
 {
 	u8 data[2];
@@ -1042,6 +1055,7 @@ static int max77729_fg_read_SoH(struct max77729_fuelgauge_data *fuelgauge)
 
 	return ret;
 }
+#endif
 
 static int max77729_fg_read_cycle(struct max77729_fuelgauge_data *fuelgauge)
 {
@@ -1445,7 +1459,11 @@ static irqreturn_t max77729_jig_irq_thread(int irq, void *irq_data)
 bool max77729_fg_init(struct max77729_fuelgauge_data *fuelgauge)
 {
 	ktime_t current_time;
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 	struct timespec ts;
+#else
+        struct timespec64 ts;
+#endif
 	u8 data[2] = { 0, 0 };
 
 #if defined(ANDROID_ALARM_ACTIVATED)
@@ -1453,7 +1471,11 @@ bool max77729_fg_init(struct max77729_fuelgauge_data *fuelgauge)
 #else
 	current_time = ktime_get_boottime();
 #endif
-	ts = ktime_to_timespec(ktime_get_boottime());
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
+        ts = ktime_to_timespec64(ktime_get_boottime());
+#else
+	ts = ktime_to_timespec64(ktime_get_boottime());
+#endif
 
 	fuelgauge->info.fullcap_check_interval = ts.tv_sec;
 	fuelgauge->info.is_first_check = true;
@@ -1628,6 +1650,9 @@ static int max77729_fg_check_capacity_max(
 		((capacity_max >= cap_max) ? cap_max : capacity_max);
 }
 
+// enable it after create iio_channel
+// code debug by muralivijay
+#if 0
 static int max77729_fg_get_soc_decimal(struct max77729_fuelgauge_data *fuelgauge)
 {
 	int raw_soc;
@@ -1654,6 +1679,7 @@ static int max77729_fg_get_soc_decimal_rate(struct max77729_fuelgauge_data *fuel
 
 	return fuelgauge->dec_rate_seq[fuelgauge->dec_rate_len - 1];
 }
+#endif
 
 static int max77729_fg_calculate_dynamic_scale(
 	struct max77729_fuelgauge_data *fuelgauge, int capacity, bool scale_by_full)
@@ -2014,6 +2040,7 @@ static int max77729_fg_get_property(struct power_supply *psy,
 		val->intval = b_val.intval;
 		break;
 #endif
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 	case POWER_SUPPLY_PROP_RESISTANCE:
 		val->intval = 0;
 		break;
@@ -2026,9 +2053,10 @@ static int max77729_fg_get_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_SHUTDOWN_DELAY:
 		val->intval = fuelgauge->shutdown_delay;
 		break;
+#endif
 	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
 		val->intval = max77729_get_fuelgauge_value(fuelgauge, FG_VOLTAGE);
-		val->intval *= 1000; 
+		val->intval *= 1000;
 		/* pr_err("%s: VOLTAGE_NOW (%d)\n",__func__, val->intval); */
 		break;
 		/* Additional Voltage Information (mV) */
@@ -2052,6 +2080,7 @@ static int max77729_fg_get_property(struct power_supply *psy,
 		val->intval = POWER_SUPPLY_TECHNOLOGY_LIPO; //"Li-poly"
 		break;
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 	case POWER_SUPPLY_PROP_BATTERY_TYPE:
 		switch(fgauge_get_battery_id())
 		{
@@ -2069,6 +2098,7 @@ static int max77729_fg_get_property(struct power_supply *psy,
 				break;
 		}
 		break;
+#endif
 
 		/* Current */
 	case POWER_SUPPLY_PROP_CURRENT_NOW:
@@ -2211,6 +2241,7 @@ static int max77729_fg_get_property(struct power_supply *psy,
 #endif
 		}
 		break;
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 	case POWER_SUPPLY_PROP_FASTCHARGE_MODE:
 		val->intval = fuelgauge->is_fastcharge;
 		break;
@@ -2220,6 +2251,7 @@ static int max77729_fg_get_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_SOC_DECIMAL_RATE:
 		val->intval = max77729_fg_get_soc_decimal_rate(fuelgauge);
 		break;
+#endif
 	case POWER_SUPPLY_PROP_ENERGY_FULL_DESIGN:
 		val->intval = fuelgauge->capacity_max;
 		break;
@@ -2232,9 +2264,11 @@ static int max77729_fg_get_property(struct power_supply *psy,
 			(fuelgauge->battery_data->Capacity * fuelgauge->fg_resistor / 2);
 		val->intval = val->intval / 1000;
 		break;
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 	case POWER_SUPPLY_PROP_SOH:
 		val->intval = max77729_fg_read_SoH(fuelgauge);
 		break;
+#endif
 	case POWER_SUPPLY_PROP_CYCLE_COUNT:
 		val->intval = max77729_fg_read_cycle(fuelgauge);
 		break;
@@ -2394,9 +2428,11 @@ static int max77729_fg_set_property(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_TEMP_AMBIENT:
 		break;
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 	case POWER_SUPPLY_PROP_FASTCHARGE_MODE:
 		fuelgauge->is_fastcharge = val->intval;
 		break;
+#endif
 	case POWER_SUPPLY_PROP_ENERGY_NOW:
 		/* pr_info("%s: POWER_SUPPLY_PROP_ENERGY_NOW\n", __func__); */
 		max77729_fg_reset_capacity_by_jig_connection(fuelgauge);
@@ -2474,6 +2510,7 @@ static int max77729_fg_set_property(struct power_supply *psy,
 	return 0;
 }
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 static u8 fgauge_get_battery_id(void)
 {
 	struct power_supply *max_verify_psy;
@@ -2482,14 +2519,18 @@ static u8 fgauge_get_battery_id(void)
 	int rc;
 	max_verify_psy = power_supply_get_by_name("batt_verify");
 	if (max_verify_psy != NULL) {
+// disable chip_ok until create iio_channel
+// code debug by muralivijay
 		rc = power_supply_get_property(max_verify_psy,
 				POWER_SUPPLY_PROP_CHIP_OK, &pval);
 		if (rc < 0)
 			pr_err("fgauge_get_profile_id: get romid error.\n");
 
 		if (pval.intval) {
+// disable page0_data until create iio_channel
 			rc = power_supply_get_property(max_verify_psy,
 					POWER_SUPPLY_PROP_PAGE0_DATA, &pval);
+
 			if (rc < 0) {
 				pr_err("fgauge_get_profile_id: get page0 error.\n");
 			} else {
@@ -2510,6 +2551,7 @@ static u8 fgauge_get_battery_id(void)
 	pr_err("fgauge_get_profile_id: get_battery_id=%d.\n", get_battery_id);
 	return get_battery_id;
 }
+#endif
 
 static void max77729_fg_isr_work(struct work_struct *work)
 {
@@ -2530,7 +2572,11 @@ static void max77729_shutdown_delay_work(struct work_struct *work)
 
 	shutdown_val.intval = fuelgauge->shutdown_delay;
 	pr_info("%s: wzt bms set battery prop now: %d \n", __func__, shutdown_val.intval);
+//disable shutdown delay until create iio channel
+// code debug by muralivijay
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 	psy_do_property("battery", set, POWER_SUPPLY_PROP_SHUTDOWN_DELAY, shutdown_val);
+#endif
 }
 
 
@@ -2765,7 +2811,9 @@ static int max77729_fuelgauge_parse_dt(struct max77729_fuelgauge_data *fuelgauge
 			/* 0: BAT_ID LOW, 1: BAT_ID OPEN */
 			battery_id = gpio_get_value(pdata->bat_id_gpio);
 		} else {
-			battery_id = fgauge_get_battery_id();
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
+			battery_id = fgauge_get_battery_id(); //code debug by muralivijay
+#endif
              /* pr_err("%s: reading battery_id = %d\n", */
 				/* __func__, battery_id); */
 		}
@@ -2928,7 +2976,11 @@ static int max77729_fuelgauge_parse_dt(struct max77729_fuelgauge_data *fuelgauge
 
 static const struct power_supply_desc max77729_fuelgauge_power_supply_desc = {
 	.name = "bms",
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 	.type = POWER_SUPPLY_TYPE_BMS,
+#else
+        .type = QTI_POWER_SUPPLY_TYPE_BMS,
+#endif
 	.properties = max77729_fuelgauge_props,
 	.num_properties = ARRAY_SIZE(max77729_fuelgauge_props),
 	.get_property = max77729_fg_get_property,
@@ -2945,7 +2997,9 @@ static int max77729_fuelgauge_probe(struct platform_device *pdev)
 	struct max77729_fuelgauge_data *fuelgauge;
 	struct power_supply_config fuelgauge_cfg = { };
 	union power_supply_propval raw_soc_val;
- 	struct power_supply *max_verify_psy = NULL;
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
+ 	struct power_supply *max_verify_psy = NULL; //code debug by muralivijay
+#endif
 	int ret = 0;
 
 	pr_info("%s: max77729 Fuelgauge Driver Loading\n", __func__);
