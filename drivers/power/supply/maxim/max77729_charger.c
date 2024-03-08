@@ -4452,11 +4452,17 @@ static int max77729_charger_probe(struct platform_device *pdev)
 	max77729_charger_platform_data_t *charger_data;
 	struct max77729_charger_data *charger;
 	struct power_supply_config charger_cfg = { };
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(5, 4, 0))
+	struct iio_dev *indio_dev = NULL;
+        struct iio_dev *indio_dev1 = NULL;
+	static probe_cnt = 0;
+#endif
 	int ret = 0;
 	u8 reg_data;
 
         pr_info("%s: max77729 Charger Driver Loading\n", __func__);
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 	charger = kzalloc(sizeof(*charger), GFP_KERNEL);
 	if (!charger)
 		return -ENOMEM;
@@ -4466,10 +4472,39 @@ static int max77729_charger_probe(struct platform_device *pdev)
 		ret = -ENOMEM;
 		goto err_free;
 	}
+#else
+	if (probe_cnt == 0) {
+		pr_err("%s enter !\n",__func__);
+	}
 
+	probe_cnt ++;
+
+	indio_dev = devm_iio_device_alloc(&pdev->dev, sizeof(*charger));
+
+	if (!indio_dev){
+		pr_err("Failed to allocate memory\n");
+		return -ENOMEM;
+	}
+
+        indio_dev1 = devm_iio_device_alloc(&pdev->dev, sizeof(max77729_charger_platform_data_t));
+
+        if (!indio_dev1){
+                pr_err("Failed to allocate memory\n");
+                return -ENOMEM;
+                goto err_free;
+        }
+#endif
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 	mutex_init(&charger->charger_mutex);
 	mutex_init(&charger->mode_mutex);
 
+#else
+	charger = iio_priv(indio_dev);
+	charger->indio_dev = indio_dev;
+        charger_data = iio_priv(indio_dev1);
+        charger_data->indio_dev1 = indio_dev1;
+#endif
 	charger->dev = &pdev->dev;
 	charger->i2c = max77729->charger;
 	charger->pmic_i2c = max77729->i2c;
@@ -4484,6 +4519,11 @@ static int max77729_charger_probe(struct platform_device *pdev)
 	charger->wc_pre_current = WC_CURRENT_START;
 	charger->cable_type = SEC_BATTERY_CABLE_NONE;
 	charger->in_suspend = false;
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
+        mutex_init(&charger->charger_mutex);
+        mutex_init(&charger->mode_mutex);
+#endif
 
 	if (max77729_read_reg(max77729->i2c, MAX77729_PMIC_REG_PMICREV, &reg_data) < 0) {
 		pr_err("device not found on this channel (this is not an error)\n");
@@ -4769,9 +4809,13 @@ err_power_supply_registers:
 err_pdata_free:
 	mutex_destroy(&charger->mode_mutex);
 	mutex_destroy(&charger->charger_mutex);
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 	kfree(charger_data);
+#endif
 err_free:
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 	kfree(charger);
+#endif
 	return ret;
 }
 

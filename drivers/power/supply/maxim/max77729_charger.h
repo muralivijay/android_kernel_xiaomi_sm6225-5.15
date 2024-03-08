@@ -345,6 +345,10 @@ typedef struct max77729_charger_platform_data {
 	char *wireless_charger_name;
 	int wireless_cc_cv;
 
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(5, 4, 0))
+        struct iio_dev  *indio_dev1;
+#endif
+
 	/* float voltage (mV) */
 	int chg_float_voltage;
 	int chg_irq;
