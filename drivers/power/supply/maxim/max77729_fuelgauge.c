@@ -21,6 +21,9 @@
 #include <linux/power_supply.h>
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(5, 4, 0))
 #include <linux/qti_power_supply.h>
+#include "max77729_fuelgauge_iio.h"
+#include <linux/iio/consumer.h>
+#include <dt-bindings/iio/qti_power_supply_iio.h>
 #endif
 #include "max77729_fuelgauge.h"
 
@@ -48,13 +51,13 @@ static enum power_supply_property max77729_fuelgauge_props[] = {
 	POWER_SUPPLY_PROP_SOC_DECIMAL_RATE,
         POWER_SUPPLY_PROP_BATTERY_TYPE,
         POWER_SUPPLY_PROP_SHUTDOWN_DELAY,
-#endif
 #ifdef CONFIG_BATT_VERIFY_BY_DS28E16
 	POWER_SUPPLY_PROP_AUTHENTIC,
 	POWER_SUPPLY_PROP_ROMID,
 	POWER_SUPPLY_PROP_DS_STATUS,
 	POWER_SUPPLY_PROP_PAGE0_DATA,
 	POWER_SUPPLY_PROP_CHIP_OK,
+#endif
 #endif
         POWER_SUPPLY_PROP_CHARGE_FULL,
 	POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN,
@@ -83,11 +86,136 @@ static void max77729_fg_periodic_read_power(
 				struct max77729_fuelgauge_data *fuelgauge);
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 static u8 fgauge_get_battery_id(void); //code debug by muralivijay
+#else
+/* Don,t enable right now */
+//static int fgauge_get_battery_id(struct max77729_fuelgauge_data *fuelgauge);
 #endif
 
 static struct device_attribute max77729_fg_attrs[] = {
 	MAX77729_FG_ATTR(fg_data),
 };
+
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(5, 4, 0))
+enum max77729_fg_iio_type {
+	MAX77729_FG_DS,
+	MAX77729_FG_BMS,
+};
+
+enum ds_iio_channels {
+	DS_AUTHEN_RESULT,
+	DS_ROMID,
+	DS_STATUS,
+	DS_PAGE0_DATA,
+	DS_CHIP_OK,
+};
+
+static const char * const ds_iio_chan_name[] = {
+	[DS_AUTHEN_RESULT] = "ds_authen_result",
+	[DS_ROMID] = "ds_romid",
+	[DS_STATUS] = "ds_status",
+	[DS_PAGE0_DATA] = "ds_page0_data",
+	[DS_CHIP_OK] = "ds_chip_ok",
+};
+
+enum bms_iio_channels {
+	MAX77729_FG_SHUTDOWN_DELAY,
+};
+
+static const char * const bms_iio_chan_name[] = {
+	[MAX77729_FG_SHUTDOWN_DELAY] = "shutdown_delay",
+};
+
+static bool is_ds_chan_valid(struct max77729_fuelgauge_data *fuelgauge,
+		enum ds_iio_channels chan)
+{
+	int rc;
+
+	if (IS_ERR(fuelgauge->ds_iio[chan])){
+		pr_err("ds_iio[chan] ERROR!\n");
+		return false;
+	}
+
+	if (!fuelgauge->ds_iio[chan]) {
+		fuelgauge->ds_iio[chan] = iio_channel_get(fuelgauge->dev,
+					ds_iio_chan_name[chan]);
+		if (IS_ERR(fuelgauge->ds_iio[chan])) {
+			rc = PTR_ERR(fuelgauge->ds_iio[chan]);
+			if (rc == -EPROBE_DEFER)
+				fuelgauge->ds_iio[chan] = NULL;
+			pr_err("Failed to get IIO channel %s, rc=%d\n",
+				ds_iio_chan_name[chan], rc);
+			return false;
+		}
+	}
+	return true;
+}
+
+static bool is_bms_chan_valid(struct max77729_fuelgauge_data *fuelgauge,
+		enum bms_iio_channels chan)
+{
+	int rc;
+	if (IS_ERR(fuelgauge->bms_iio[chan]))
+		return false;
+	if (!fuelgauge->bms_iio[chan]) {
+		fuelgauge->bms_iio[chan] = iio_channel_get(fuelgauge->dev,
+					bms_iio_chan_name[chan]);
+		if (IS_ERR(fuelgauge->bms_iio[chan])) {
+			rc = PTR_ERR(fuelgauge->bms_iio[chan]);
+			if (rc == -EPROBE_DEFER)
+				fuelgauge->bms_iio[chan] = NULL;
+			pr_err("Failed to get IIO channel %s, rc=%d\n",
+				bms_iio_chan_name[chan], rc);
+			return false;
+		}
+	}
+	return true;
+}
+
+int max77729_fg_get_iio_channel(struct max77729_fuelgauge_data *fuelgauge,
+			enum max77729_fg_iio_type type, int channel, int *val)
+{
+	struct iio_channel *iio_chan_list = NULL;
+	int rc = 0;
+
+	switch (type) {
+	case MAX77729_FG_DS:
+		if (!is_ds_chan_valid(fuelgauge, channel))
+			return -ENODEV;
+		iio_chan_list = fuelgauge->ds_iio[channel];
+		break;
+
+	default:
+		pr_err("iio_type %d is not supported\n", type);
+		return -EINVAL;
+	}
+
+	rc = iio_read_channel_processed(iio_chan_list, val);
+
+	return rc < 0 ? rc : 0;
+}
+
+int max77729_fg_set_iio_channel(struct max77729_fuelgauge_data *fuelgauge,
+			enum max77729_fg_iio_type type, int channel, int val)
+{
+	struct iio_channel *iio_chan_list = NULL;
+	int rc = 0;
+
+	switch (type) {
+	case  MAX77729_FG_BMS:
+		if (!is_bms_chan_valid(fuelgauge, channel))
+			return -ENODEV;
+		iio_chan_list = fuelgauge->bms_iio[channel];
+		break;
+	default:
+		pr_err("iio_type %d is not supported\n", type);
+		return -EINVAL;
+	}
+
+	rc = iio_write_channel_raw(iio_chan_list, val);
+
+	return rc < 0 ? rc : 0;
+}
+#endif
 
 static void max77729_fg_model_load(struct max77729_fuelgauge_data *fg)
 {
@@ -1032,9 +1160,6 @@ static int max77729_fg_read_vsys(struct max77729_fuelgauge_data *fuelgauge)
 	return vsys;
 }
 
-// enable it after create iio_channel
-// code debug by muralivijay
-#if 0
 static int max77729_fg_read_SoH(struct max77729_fuelgauge_data *fuelgauge)
 {
 	u8 data[2];
@@ -1055,7 +1180,6 @@ static int max77729_fg_read_SoH(struct max77729_fuelgauge_data *fuelgauge)
 
 	return ret;
 }
-#endif
 
 static int max77729_fg_read_cycle(struct max77729_fuelgauge_data *fuelgauge)
 {
@@ -1650,9 +1774,6 @@ static int max77729_fg_check_capacity_max(
 		((capacity_max >= cap_max) ? cap_max : capacity_max);
 }
 
-// enable it after create iio_channel
-// code debug by muralivijay
-#if 0
 static int max77729_fg_get_soc_decimal(struct max77729_fuelgauge_data *fuelgauge)
 {
 	int raw_soc;
@@ -1679,7 +1800,6 @@ static int max77729_fg_get_soc_decimal_rate(struct max77729_fuelgauge_data *fuel
 
 	return fuelgauge->dec_rate_seq[fuelgauge->dec_rate_len - 1];
 }
-#endif
 
 static int max77729_fg_calculate_dynamic_scale(
 	struct max77729_fuelgauge_data *fuelgauge, int capacity, bool scale_by_full)
@@ -1995,6 +2115,7 @@ static int max77729_fg_get_property(struct power_supply *psy,
 	int vbat_mv;
 	static bool last_shutdown_delay;
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 #ifdef CONFIG_BATT_VERIFY_BY_DS28E16
 	union power_supply_propval b_val = {0,};
 	if (fuelgauge->max_verify_psy == NULL)
@@ -2010,9 +2131,10 @@ static int max77729_fg_get_property(struct power_supply *psy,
 	    }
 	}
 #endif
-
+#endif
 	switch ((int)psp) {
 		/* Cell voltage (VCELL, mV) */
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))		
 #ifdef CONFIG_BATT_VERIFY_BY_DS28E16
 	case POWER_SUPPLY_PROP_AUTHENTIC:
 		power_supply_get_property(fuelgauge->max_verify_psy,
@@ -2040,7 +2162,6 @@ static int max77729_fg_get_property(struct power_supply *psy,
 		val->intval = b_val.intval;
 		break;
 #endif
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 	case POWER_SUPPLY_PROP_RESISTANCE:
 		val->intval = 0;
 		break;
@@ -2510,6 +2631,7 @@ static int max77729_fg_set_property(struct power_supply *psy,
 	return 0;
 }
 
+// code debug by muralivijay
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 static u8 fgauge_get_battery_id(void)
 {
@@ -2519,15 +2641,12 @@ static u8 fgauge_get_battery_id(void)
 	int rc;
 	max_verify_psy = power_supply_get_by_name("batt_verify");
 	if (max_verify_psy != NULL) {
-// disable chip_ok until create iio_channel
-// code debug by muralivijay
 		rc = power_supply_get_property(max_verify_psy,
 				POWER_SUPPLY_PROP_CHIP_OK, &pval);
 		if (rc < 0)
 			pr_err("fgauge_get_profile_id: get romid error.\n");
 
 		if (pval.intval) {
-// disable page0_data until create iio_channel
 			rc = power_supply_get_property(max_verify_psy,
 					POWER_SUPPLY_PROP_PAGE0_DATA, &pval);
 
@@ -2551,6 +2670,86 @@ static u8 fgauge_get_battery_id(void)
 	pr_err("fgauge_get_profile_id: get_battery_id=%d.\n", get_battery_id);
 	return get_battery_id;
 }
+#else
+static int get_battery_id_from_ds(struct max77729_fuelgauge_data *fuelgauge)
+{
+	union power_supply_propval pval = {0, };
+	int batt_id = -1;
+	int rc = 0;
+
+	if (is_ds_chan_valid(fuelgauge, 0)) {
+		rc = max77729_fg_get_iio_channel(fuelgauge, MAX77729_FG_DS,
+				DS_CHIP_OK, &pval.intval);
+		if (rc < 0){
+			pr_err("get chip_ok error !\n");
+			return rc;
+		}
+	}
+
+	if (pval.intval == true) {
+		rc = max77729_fg_get_iio_channel(fuelgauge, MAX77729_FG_DS,
+				DS_PAGE0_DATA, &pval.intval);
+		if (rc < 0) {
+			pr_err("get page0 error.\n");
+			return rc;
+		} else {
+			if (pval.intval == 'N') {
+				batt_id = BATTERY_VENDOR_NVT;
+			} else if (pval.intval == 'C') {
+				batt_id = BATTERY_VENDOR_GY;
+			} else if (pval.intval == 'V') {
+				batt_id = BATTERY_VENDOR_GY;
+			} else if (pval.intval == 'L') {
+				batt_id = BATTERY_VENDOR_XWD;
+			} else if (pval.intval == 'S') {
+				batt_id = BATTERY_VENDOR_XWD;
+			} else if (pval.intval == 'X') {
+				batt_id = BATTERY_VENDOR_XWD;
+			}
+		}
+	}
+	pr_info("batt_id = %d.\n",batt_id);
+
+	return batt_id;
+}
+
+static int fgauge_get_battery_id(struct max77729_fuelgauge_data *fuelgauge)
+{
+	int rc = 0;
+
+	if (fuelgauge->batt_id == -1) {
+			rc = get_battery_id_from_ds(fuelgauge);
+			if(rc <= BATTERY_VENDOR_START || rc >= BATTERY_VENDOR_UNKNOWN){
+				fuelgauge->batt_id = BATTERY_VENDOR_START;
+			pr_err(" Failed to get battery id = %d. retrying after 60 secs \n", fuelgauge->batt_id);
+				cancel_delayed_work_sync(&fuelgauge->retry_battery_id_work);
+				schedule_delayed_work(&fuelgauge->retry_battery_id_work, 60*1000);
+			}else{
+				fuelgauge->batt_id = rc;
+		        pr_info(" Successfully get battery id: %d \n", fuelgauge->batt_id);
+			}
+		}
+	pr_info("fgauge_get_profile_id: get_battery_id = %d.\n", fuelgauge->batt_id);
+
+	return fuelgauge->batt_id;
+}
+
+static void retry_battery_id_func(struct work_struct *work)
+{
+	struct max77729_fuelgauge_data *fuelgauge = container_of(work,
+			struct max77729_fuelgauge_data,
+			retry_battery_id_work.work);
+	int batt_id;
+
+	batt_id = get_battery_id_from_ds(fuelgauge);
+
+	if(batt_id <= BATTERY_VENDOR_START || batt_id >= BATTERY_VENDOR_UNKNOWN) {
+		pr_err(" Failed to get battery id retrying after 60 secs \n");
+			schedule_delayed_work(&fuelgauge->retry_battery_id_work, 60*1000);
+	} else {
+		pr_info(" Successfully get battery id: %d \n", batt_id);
+	}
+}
 #endif
 
 static void max77729_fg_isr_work(struct work_struct *work)
@@ -2572,10 +2771,14 @@ static void max77729_shutdown_delay_work(struct work_struct *work)
 
 	shutdown_val.intval = fuelgauge->shutdown_delay;
 	pr_info("%s: wzt bms set battery prop now: %d \n", __func__, shutdown_val.intval);
-//disable shutdown delay until create iio channel
 // code debug by muralivijay
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 	psy_do_property("battery", set, POWER_SUPPLY_PROP_SHUTDOWN_DELAY, shutdown_val);
+#else
+	if (!fuelgauge->psy_batt)
+		fuelgauge->psy_batt = power_supply_get_by_name("battery");
+	if(fuelgauge->psy_batt)
+	max77729_fg_set_iio_channel(fuelgauge, MAX77729_FG_BMS, MAX77729_FG_SHUTDOWN_DELAY, shutdown_val.intval);
 #endif
 }
 
@@ -2812,8 +3015,10 @@ static int max77729_fuelgauge_parse_dt(struct max77729_fuelgauge_data *fuelgauge
 			battery_id = gpio_get_value(pdata->bat_id_gpio);
 		} else {
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
-			battery_id = fgauge_get_battery_id(); //code debug by muralivijay
-#endif
+			battery_id = fgauge_get_battery_id();
+#else
+			battery_id = fgauge_get_battery_id(fuelgauge);
+#endif			
              /* pr_err("%s: reading battery_id = %d\n", */
 				/* __func__, battery_id); */
 		}
@@ -2989,6 +3194,191 @@ static const struct power_supply_desc max77729_fuelgauge_power_supply_desc = {
 	.no_thermal = true,
 };
 
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(5, 4, 0))
+static int max77729_fg_iio_read_raw(struct iio_dev *indio_dev,
+		struct iio_chan_spec const *chan, int *val1,
+		int *val2, long mask)
+{
+	struct max77729_fuelgauge_data *fuelgauge = iio_priv(indio_dev);
+	int rc = 0;
+
+	*val1 = 0;
+
+	switch (chan->channel) {
+	case PSY_IIO_SHUTDOWN_DELAY:
+		*val1 = fuelgauge->shutdown_delay;
+		break;
+	case PSY_IIO_RESISTANCE:
+		*val1 = 0;
+		break;
+	case PSY_IIO_RESISTANCE_ID:
+		if (fuelgauge->battery_data->battery_id == BATTERY_VENDOR_UNKNOWN) {
+		   fuelgauge->battery_data->battery_id = fgauge_get_battery_id(fuelgauge);
+		}
+		*val1 = fuelgauge->battery_data->battery_id;
+		break;
+	case PSY_IIO_SOC_DECIMAL:
+		*val1 = max77729_fg_get_soc_decimal(fuelgauge);
+		break;
+	case PSY_IIO_SOC_DECIMAL_RATE:
+		*val1 = max77729_fg_get_soc_decimal_rate(fuelgauge);
+		break;
+	case PSY_IIO_FASTCHARGE_MODE:
+		*val1 = fuelgauge->is_fastcharge;
+		break;
+	case PSY_IIO_BATTERY_TYPE:
+		switch (fgauge_get_battery_id(fuelgauge)) {
+			case BATTERY_VENDOR_NVT:
+				*val1 = 3;		//"M376-NVT-5000mAh";
+				break;
+			case BATTERY_VENDOR_GY:
+				*val1 = 1;		//"M376-GuanYu-5000mAh";
+				break;
+			case BATTERY_VENDOR_XWD:
+				*val1 = 2;		//"M376-Sunwoda-5000mAh";
+				break;
+			default:
+				*val1 = 0;		//"M376-unknown-5000mAh";
+				break;
+		}
+		break;
+
+	case PSY_IIO_SOH:
+		*val1 = max77729_fg_read_SoH(fuelgauge);
+		break;
+	default:
+		pr_info("Unsupported max77729_fg IIO chan %d\n", chan->channel);
+		rc = -EINVAL;
+		break;
+	}
+
+	if (rc < 0) {
+		pr_err("Couldn't read IIO channel %d, rc = %d\n",
+			chan->channel, rc);
+		return rc;
+	}
+
+	return IIO_VAL_INT;
+}
+
+static int max77729_fg_iio_write_raw(struct iio_dev *indio_dev,
+		struct iio_chan_spec const *chan, int val1,
+		int val2, long mask)
+{
+	struct max77729_fuelgauge_data *fuelgauge = iio_priv(indio_dev);
+	int rc = 0;
+
+	switch (chan->channel) {
+	case PSY_IIO_FASTCHARGE_MODE:
+		fuelgauge->is_fastcharge = val1;
+		break;
+
+	default:
+		pr_err("Unsupported MAX77729_FG IIO chan %d\n", chan->channel);
+		rc = -EINVAL;
+		break;
+	}
+	if (rc < 0)
+		pr_err("Couldn't write IIO channel %d, rc = %d\n",
+			chan->channel, rc);
+	return rc;
+}
+
+static int max77729_fg_iio_of_xlate(struct iio_dev *indio_dev,
+				const struct of_phandle_args *iiospec)
+{
+	struct max77729_fuelgauge_data *fuelgauge = iio_priv(indio_dev);
+	struct iio_chan_spec *iio_chan = fuelgauge->iio_chan;
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(max77729_fg_iio_psy_channels);
+					i++, iio_chan++)
+		if (iio_chan->channel == iiospec->args[0])
+			return i;
+
+	return -EINVAL;
+}
+
+static const struct iio_info max77729_fg_iio_info = {
+	.read_raw	= max77729_fg_iio_read_raw,
+	.write_raw	= max77729_fg_iio_write_raw,
+	.of_xlate	= max77729_fg_iio_of_xlate,
+};
+
+static int max77729_fg_init_iio_psy(struct max77729_fuelgauge_data *chip)
+{
+	struct iio_dev *indio_dev = chip->indio_dev;
+	struct iio_chan_spec *chan = NULL;
+	int num_iio_channels = ARRAY_SIZE(max77729_fg_iio_psy_channels);
+	int rc = 0, i = 0;
+
+	pr_info("max77729_fg_init_iio_psy start\n");
+	chip->iio_chan = devm_kcalloc(chip->dev, num_iio_channels,
+				sizeof(*chip->iio_chan), GFP_KERNEL);
+	if (!chip->iio_chan)
+		return -ENOMEM;
+
+	chip->int_iio_chans = devm_kcalloc(chip->dev,
+				num_iio_channels,
+				sizeof(*chip->int_iio_chans),
+				GFP_KERNEL);
+
+	if (!chip->int_iio_chans)
+		return -ENOMEM;
+
+	indio_dev->info = &max77729_fg_iio_info;
+	indio_dev->dev.parent = chip->dev;
+	indio_dev->dev.of_node = chip->dev->of_node;
+	indio_dev->modes = INDIO_DIRECT_MODE;
+	indio_dev->channels = chip->iio_chan;
+	indio_dev->num_channels = num_iio_channels;
+	indio_dev->name = "max77729_fuelgauge";
+
+	for (i = 0; i < num_iio_channels; i++) {
+		chip->int_iio_chans[i].indio_dev = indio_dev;
+		chan = &chip->iio_chan[i];
+		chip->int_iio_chans[i].channel = chan;
+		chan->address = i;
+		chan->channel = max77729_fg_iio_psy_channels[i].channel_num;
+		chan->type = max77729_fg_iio_psy_channels[i].type;
+		chan->datasheet_name =
+			max77729_fg_iio_psy_channels[i].datasheet_name;
+		chan->extend_name =
+			max77729_fg_iio_psy_channels[i].datasheet_name;
+		chan->info_mask_separate =
+			max77729_fg_iio_psy_channels[i].info_mask;
+	}
+
+	rc = devm_iio_device_register(chip->dev, indio_dev);
+
+	if (rc)
+		pr_err("Failed to register MAX77729_FG IIO device, rc=%d\n", rc);
+
+	pr_info("battery IIO device, rc=%d\n", rc);
+
+	return rc;
+}
+
+static int max77729_fg_ext_init_iio_psy(struct max77729_fuelgauge_data *fuelgauge)
+{
+	if (!fuelgauge)
+		return -ENOMEM;
+
+	pr_err("ds_iio_init start\n");
+	fuelgauge->ds_iio = devm_kcalloc(fuelgauge->dev,
+		ARRAY_SIZE(ds_iio_chan_name), sizeof(*fuelgauge->ds_iio), GFP_KERNEL);
+	if (!fuelgauge->ds_iio)
+		return -ENOMEM;
+	fuelgauge->bms_iio = devm_kcalloc(fuelgauge->dev,
+		ARRAY_SIZE(bms_iio_chan_name), sizeof(*fuelgauge->bms_iio), GFP_KERNEL);
+	if (!fuelgauge->bms_iio)
+		return -ENOMEM;
+	pr_err("ds_iio_init end\n");
+
+	return 0;
+}
+#endif
+
 static int max77729_fuelgauge_probe(struct platform_device *pdev)
 {
 	struct max77729_dev *max77729 = dev_get_drvdata(pdev->dev.parent);
@@ -2998,11 +3388,16 @@ static int max77729_fuelgauge_probe(struct platform_device *pdev)
 	struct power_supply_config fuelgauge_cfg = { };
 	union power_supply_propval raw_soc_val;
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
- 	struct power_supply *max_verify_psy = NULL; //code debug by muralivijay
+ 	struct power_supply *max_verify_psy = NULL;
+#else
+	struct iio_dev *indio_dev = NULL;
+        struct iio_dev *indio_dev1 = NULL;
+	static probe_cnt = 0; 	
 #endif
 	int ret = 0;
 
 	pr_info("%s: max77729 Fuelgauge Driver Loading\n", __func__);
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))	
 #ifdef CONFIG_BATT_VERIFY_BY_DS28E16
 	if (max77729_read_word(max77729->fuelgauge, STATUS_REG) & BIT(1)){         //if fg chip por flag set, should be wait for battery id from ds28e16
 		max_verify_psy = power_supply_get_by_name("batt_verify");
@@ -3024,7 +3419,42 @@ static int max77729_fuelgauge_probe(struct platform_device *pdev)
 	}
 
 	mutex_init(&fuelgauge->fg_lock);
+#else	
+	if (probe_cnt == 0) {
+		pr_err("%s enter !\n",__func__);
+	}
 
+	probe_cnt ++;
+
+	indio_dev = devm_iio_device_alloc(&pdev->dev, sizeof(*fuelgauge));
+
+	if (!indio_dev){
+		pr_err("Failed to allocate fuelgauge memory\n");
+		return -ENOMEM;
+	}
+
+        indio_dev1 = devm_iio_device_alloc(&pdev->dev, sizeof(max77729_fuelgauge_platform_data_t));
+
+        if (!indio_dev1){
+                pr_err("Failed to allocate fuelgauge platform memory\n");
+                return -ENOMEM;
+                goto err_free;
+        }
+
+
+	fuelgauge = iio_priv(indio_dev);
+	fuelgauge->indio_dev = indio_dev;
+        fuelgauge_data = iio_priv(indio_dev1);
+        fuelgauge_data->indio_dev1 = indio_dev1;
+        
+	max77729_fg_ext_init_iio_psy(fuelgauge);
+	if (!is_ds_chan_valid(fuelgauge, 0)) {
+		return -EPROBE_DEFER;
+	}        
+
+	mutex_init(&fuelgauge->fg_lock);
+#endif
+        
 	fuelgauge->dev = &pdev->dev;
 	fuelgauge->pdata = fuelgauge_data;
 	fuelgauge->i2c = max77729->fuelgauge;
@@ -3047,6 +3477,15 @@ static int max77729_fuelgauge_probe(struct platform_device *pdev)
 		pr_err("%s not found fg dt! ret[%d]\n", __func__, ret);
 #endif
 
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(5, 4, 0))
+	INIT_DELAYED_WORK(&fuelgauge->retry_battery_id_work, retry_battery_id_func); //retry for get battery id
+
+	ret = max77729_fg_init_iio_psy(fuelgauge);
+	if (ret < 0) {
+		pr_err("Failed to initialize MAX77729_FG IIO PSY, ret=%d\n", ret);
+		goto err_free;
+	}
+#endif
 	platform_set_drvdata(pdev, fuelgauge);
 
 	max77729_fg_model_load(fuelgauge);
@@ -3141,11 +3580,14 @@ err_data_free:
 	kfree(fuelgauge->battery_data);
 #endif
 err_pdata_free:
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 	kfree(fuelgauge_data);
+#endif	
 	mutex_destroy(&fuelgauge->fg_lock);
 err_free:
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 	kfree(fuelgauge);
-
+#endif
 	return ret;
 }
 
@@ -3166,9 +3608,11 @@ static int max77729_fuelgauge_remove(struct platform_device *pdev)
 #if defined(CONFIG_OF)
 	kfree(fuelgauge->battery_data);
 #endif
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 	kfree(fuelgauge->pdata);
-	mutex_destroy(&fuelgauge->fg_lock);
 	kfree(fuelgauge);
+#endif
+	mutex_destroy(&fuelgauge->fg_lock);
 
 	/* pr_info("%s: --\n", __func__); */
 

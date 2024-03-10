@@ -45,12 +45,22 @@ enum {
 	FG_DATA,
 };
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 enum {
 	BATTERY_VENDOR_NVT = 0,
 	BATTERY_VENDOR_GY = 1,
 	BATTERY_VENDOR_XWD = 2,
 	BATTERY_VENDOR_UNKNOWN = 3
 };
+#else
+enum {
+	BATTERY_VENDOR_START = 0,
+	BATTERY_VENDOR_GY = 1,
+	BATTERY_VENDOR_XWD = 2,
+	BATTERY_VENDOR_NVT = 3,
+	BATTERY_VENDOR_UNKNOWN = 4
+};
+#endif
 
 ssize_t max77729_fg_show_attrs(struct device *dev,
 				struct device_attribute *attr, char *buf);
@@ -164,6 +174,9 @@ typedef struct max77729_fuelgauge_platform_data {
 	int jig_gpio;
 	int jig_low_active;
 
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(5, 4, 0))
+        struct iio_dev  *indio_dev1;
+#endif
 	int bat_id_gpio;
 
 	int thermal_source;
@@ -230,6 +243,15 @@ struct max77729_fuelgauge_data {
 	struct power_supply	      *psy_batt;
 	struct delayed_work isr_work;
 	struct delayed_work shutdown_delay_work;
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(4, 19, 0))
+	struct iio_dev  *indio_dev;
+	struct iio_chan_spec    *iio_chan;
+	struct iio_channel      *int_iio_chans;
+	struct iio_channel	**ds_iio;
+	struct iio_channel	**bms_iio;
+	struct delayed_work retry_battery_id_work;
+	int	                batt_id;
+#endif
 
 	int cable_type;
 	bool is_charging;
