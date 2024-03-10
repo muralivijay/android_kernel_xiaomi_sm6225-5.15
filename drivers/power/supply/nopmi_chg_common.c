@@ -12,7 +12,7 @@
 
 static NOPMI_CHARGER_IC_TYPE nopmi_charger_ic = NOPMI_CHARGER_IC_NONE;
 extern struct max77729_usbc_platform_data *g_usbc_data;
-extern int main_set_charge_enable(bool en);
+//extern int main_set_charge_enable(bool en);
 extern struct nopmi_chg *g_nopmi_chg;
 extern int adapter_dev_get_pd_verified(void);
 
@@ -75,7 +75,7 @@ int nopmi_chg_is_usb_present(struct power_supply *usb_psy)
 	return usb_present;
 
 }
-#if 1
+#if 0
 char nopmi_set_charger_ic_type(NOPMI_CHARGER_IC_TYPE nopmi_type)
 {
 	char ret = 0;
@@ -111,7 +111,7 @@ NOPMI_CHARGER_IC_TYPE nopmi_get_charger_ic_type(void)
 }
 EXPORT_SYMBOL_GPL(nopmi_get_charger_ic_type);
 
-#if 1
+#if 0
 int nopmi_set_charge_enable(bool en)
 {
 	int ret = 0;
