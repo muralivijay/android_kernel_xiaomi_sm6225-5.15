@@ -10,7 +10,7 @@
 #include <linux/ipc_logging.h>
 #include <linux/printk.h>
 
-static NOPMI_CHARGER_IC_TYPE nopmi_charger_ic = NOPMI_CHARGER_IC_NONE;
+//static NOPMI_CHARGER_IC_TYPE nopmi_charger_ic = NOPMI_CHARGER_IC_NONE;
 extern struct max77729_usbc_platform_data *g_usbc_data;
 //extern int main_set_charge_enable(bool en);
 extern struct nopmi_chg *g_nopmi_chg;
