@@ -718,46 +718,44 @@ static DEVICE_ATTR(fastcharge_mode,0660,fastcharge_mode_show,NULL);
 //wangwei add module name end
 
 static struct attribute *battery_class_attrs[] = {
-	&class_attr_soc_decimal.attr,
-	&class_attr_soc_decimal_rate.attr,
-	&class_attr_shutdown_delay.attr,
-	&class_attr_usb_real_type.attr,
-	&class_attr_real_type.attr,
-	&class_attr_chip_ok.attr,
-	&class_attr_typec_mode.attr,
-	&class_attr_typec_cc_orientation.attr,
-	&class_attr_resistance_id.attr,
-	&class_attr_cp_bus_current.attr,
-	&class_attr_input_suspend.attr,
-	&class_attr_quick_charge_type.attr,
-	&class_attr_mtbf_current.attr,
-	//&class_attr_resistance.attr,
-	&class_attr_authentic.attr,
-	&class_attr_pd_verifed.attr,
-	&class_attr_apdo_max.attr,
-	&class_attr_thermal_level.attr,
-	&class_attr_fg_batt_id.attr,
-	&class_attr_cycle_count_select.attr,
-	NULL,
+        &class_attr_chip_ok.attr,
+        &class_attr_cp_bus_current.attr,
+        &class_attr_quick_charge_type.attr,
+        &class_attr_authentic.attr,
+        &class_attr_thermal_level.attr,
+        &class_attr_fg_batt_id.attr,
+        &class_attr_mtbf_current.attr,
+        &class_attr_cycle_count_select.attr,
+        NULL,
 };
 ATTRIBUTE_GROUPS(battery_class);
 
 static struct attribute *battery_attributes[] = {
 	&dev_attr_cp_modle_name.attr,
 	&dev_attr_cp_manufacturer.attr,
-	&dev_attr_cc_modle_name.attr,
-	&dev_attr_cc_manufacturer.attr,
 	&dev_attr_ds_modle_name.attr,
 	&dev_attr_ds_manufacturer.attr,
-	&dev_attr_batt_manufacturer.attr,
 	//&dev_attr_real_type.attr,
 	//&dev_attr_input_suspend.attr,
-	&dev_attr_fastcharge_mode.attr,
 	NULL,
 };
 
+static struct attribute *battery_attributes_sm5602[] = {
+        &dev_attr_cc_modle_name.attr,
+        &dev_attr_cc_manufacturer.attr,
+        &dev_attr_batt_manufacturer.attr,
+        //&dev_attr_real_type.attr,
+        //&dev_attr_input_suspend.attr,
+        &dev_attr_fastcharge_mode.attr,
+        NULL,
+};
+
 static const struct attribute_group battery_attr_group = {
-	.attrs = battery_attributes,
+	   .attrs = battery_attributes,
+};
+
+static const struct attribute_group battery_attr_sm5602_group = {
+           .attrs = battery_attributes_sm5602,
 };
 
 static const struct attribute_group *battery_attr_groups[] = {
@@ -765,11 +763,32 @@ static const struct attribute_group *battery_attr_groups[] = {
 	NULL,
 };
 
+static const struct attribute_group *battery_attr_sm5602_groups[] = {
+        &battery_attr_sm5602_group,
+        NULL,
+};
+
 static int nopmi_chg_init_dev_class(struct nopmi_chg *chg)
 {
+        int num_attributes = 0;
 	int rc = -EINVAL;
 	if(!chg)
 		return rc;
+
+        // Include attributes based on the power IC type
+        if (NOPMI_CHARGER_IC_MAXIM != nopmi_get_charger_ic_type()) {
+          battery_class_attrs[num_attributes++] = &class_attr_usb_real_type.attr;
+          battery_class_attrs[num_attributes++] = &class_attr_shutdown_delay.attr;
+          battery_class_attrs[num_attributes++] = &class_attr_soc_decimal.attr;
+          battery_class_attrs[num_attributes++] = &class_attr_soc_decimal_rate.attr;
+          battery_class_attrs[num_attributes++] = &class_attr_input_suspend.attr;
+          battery_class_attrs[num_attributes++] = &class_attr_typec_cc_orientation.attr;
+          battery_class_attrs[num_attributes++] = &class_attr_typec_mode.attr;
+          battery_class_attrs[num_attributes++] = &class_attr_resistance_id.attr;
+          battery_class_attrs[num_attributes++] = &class_attr_pd_verifed.attr;
+          battery_class_attrs[num_attributes++] = &class_attr_apdo_max.attr;
+          battery_class_attrs[num_attributes++] = &class_attr_real_type.attr;
+       }
 
 	chg->battery_class.name = "qcom-battery";
 	chg->battery_class.class_groups = battery_class_groups;
@@ -781,7 +800,12 @@ static int nopmi_chg_init_dev_class(struct nopmi_chg *chg)
 	chg->batt_device.class = &chg->battery_class;
 	dev_set_name(&chg->batt_device, "odm_battery");
 	chg->batt_device.parent = chg->dev;
-	chg->batt_device.groups = battery_attr_groups;
+      // Set attribute groups based on power IC
+         if (NOPMI_CHARGER_IC_MAXIM != nopmi_get_charger_ic_type()) {
+             chg->batt_device.groups = battery_attr_sm5602_groups;
+     } else {
+	     chg->batt_device.groups = battery_attr_groups;
+     }
 	rc = device_register(&chg->batt_device);
 	if (rc < 0) {
 		pr_err("Failed to create battery_class rc=%d\n", rc);
