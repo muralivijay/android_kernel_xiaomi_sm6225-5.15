@@ -4208,7 +4208,7 @@ int max77729_charger_set_iio_channel(struct max77729_charger_data *chg,
 }
 
 
-static int max77729_charger_iio_read_raw(struct iio_dev *indio_dev,
+int max77729_charger_iio_read_raw(struct iio_dev *indio_dev,
 		struct iio_chan_spec const *chan, int *val1,
 		int *val2, long mask)
 {
@@ -4292,7 +4292,7 @@ static int max77729_charger_iio_read_raw(struct iio_dev *indio_dev,
 	return IIO_VAL_INT;
 }
 
-static int max77729_charger_iio_write_raw(struct iio_dev *indio_dev,
+int max77729_charger_iio_write_raw(struct iio_dev *indio_dev,
 		struct iio_chan_spec const *chan, int val1,
 		int val2, long mask)
 {

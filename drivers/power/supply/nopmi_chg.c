@@ -2305,13 +2305,14 @@ int nopmi_chg_set_iio_channel(struct nopmi_chg *chg,
 }
 EXPORT_SYMBOL(nopmi_chg_set_iio_channel);
 
-static int nopmi_chg_iio_write_raw(struct iio_dev *indio_dev,
-		struct iio_chan_spec const *chan, int val1,
-		int val2, long mask)
+
+static int nopmi_iio_write_raw_internal(struct iio_dev *indio_dev,
+                struct iio_chan_spec const *chan, int val1,
+                int val2, long mask)
 {
-	struct nopmi_chg *chip = iio_priv(indio_dev);
-	int rc = 0;
-	static int old_real_type = POWER_SUPPLY_STATUS_UNKNOWN;
+        struct nopmi_chg *chip = iio_priv(indio_dev);
+        int rc = 0;
+        static int old_real_type = POWER_SUPPLY_STATUS_UNKNOWN;
 
 	switch (chan->channel) {
 	case PSY_IIO_PD_ACTIVE:
@@ -2369,15 +2370,12 @@ static int nopmi_chg_iio_write_raw(struct iio_dev *indio_dev,
 	case PSY_IIO_TYPEC_CC_ORIENTATION:
 		chip->cc_orientation = val1;
 		break;
-	case PSY_IIO_CHARGING_ENABLED:
+	case PSY_IIO_BATTERY_CHARGING_ENABLED:
 		set_prop_battery_charging_enabled(chip->jeita_ctl.usb_icl_votable, val1);
 		break;
 	case PSY_IIO_INPUT_SUSPEND:
 		pr_info("Set input suspend prop, value:%d\n", val1);
 		rc = nopmi_set_prop_input_suspend(chip, val1);
-		break;
-	case PSY_IIO_MTBF_CUR:
-		chip->mtbf_cur = val1;
 		break;
 	case PSY_IIO_APDO_VOLT:
 		chip->apdo_volt = val1;
@@ -2387,6 +2385,39 @@ static int nopmi_chg_iio_write_raw(struct iio_dev *indio_dev,
 		break;
 	case PSY_IIO_FFC_DISABLE:
 		g_ffc_disable = val1;
+		break;
+	default:
+		pr_info("Unsupported battery internal IIO chan %d\n", chan->channel);
+		rc = -EINVAL;
+		break;
+	}
+	if (rc < 0) {
+		pr_err_ratelimited("Couldn't write internal IIO channel %d, rc = %d\n",
+			chan->channel, rc);
+		return rc;
+	}
+	return IIO_VAL_INT;
+}
+
+static int nopmi_chg_iio_write_raw(struct iio_dev *indio_dev,
+		struct iio_chan_spec const *chan, int val1,
+		int val2, long mask)
+{
+	struct nopmi_chg *chip = iio_priv(indio_dev);
+	int rc = 0;
+
+      if (NOPMI_CHARGER_IC_MAXIM == nopmi_get_charger_ic_type())
+    {
+          rc = max77729_charger_iio_write_raw(indio_dev, chan, val1, val2, mask);
+    }
+    else
+    {
+          rc = nopmi_iio_write_raw_internal(indio_dev, chan, val1, val2, mask);
+    }
+
+	switch (chan->channel) {
+	case PSY_IIO_MTBF_CUR:
+		chip->mtbf_cur = val1;
 		break;
 	default:
 		pr_info("Unsupported battery IIO chan %d\n", chan->channel);
@@ -2401,12 +2432,12 @@ static int nopmi_chg_iio_write_raw(struct iio_dev *indio_dev,
 	return IIO_VAL_INT;
 }
 
-static int nopmi_chg_iio_read_raw(struct iio_dev *indio_dev,
-		struct iio_chan_spec const *chan, int *val1,
-		int *val2, long mask)
+static int nopmi_chg_iio_read_raw_internal(struct iio_dev *indio_dev,
+                struct iio_chan_spec const *chan, int *val1,
+                int *val2, long mask)
 {
-	struct nopmi_chg *chip = iio_priv(indio_dev);
-	int rc = 0;
+        struct nopmi_chg *chip = iio_priv(indio_dev);
+        int rc = 0;
 
 	*val1 = 0;
 
@@ -2456,21 +2487,53 @@ static int nopmi_chg_iio_read_raw(struct iio_dev *indio_dev,
 			*val1 = 0;
 //HTH-260166 longcheer wangwei add typec status end
 		break;
-	case PSY_IIO_CHARGING_ENABLED:
+	case PSY_IIO_BATTERY_CHARGING_ENABLED:
 		get_prop_battery_charging_enabled(chip->jeita_ctl.usb_icl_votable, val1);
 		break;
 	case PSY_IIO_INPUT_SUSPEND:
 		*val1 = chip->input_suspend;
 		break;
-	case PSY_IIO_MTBF_CUR:
-		*val1 = chip->mtbf_cur;
-		break;
-	case PSY_IIO_CHARGE_IC_TYPE:
-		*val1 = chip->charge_ic_type;
-		break;
 	case PSY_IIO_FFC_DISABLE:
 		*val1 = g_ffc_disable;
 		break;
+	default:
+		pr_debug("Unsupported battery IIO chan %d\n", chan->channel);
+		rc = -EINVAL;
+		break;
+	}
+	if (rc < 0) {
+		pr_err_ratelimited("Couldn't read IIO channel %d, rc = %d\n",
+			chan->channel, rc);
+		return rc;
+	}
+	return IIO_VAL_INT;
+}
+
+static int nopmi_chg_iio_read_raw(struct iio_dev *indio_dev,
+		struct iio_chan_spec const *chan, int *val1,
+		int *val2, long mask)
+{
+	struct nopmi_chg *chip = iio_priv(indio_dev);
+	int rc = 0;
+
+      if (NOPMI_CHARGER_IC_MAXIM == nopmi_get_charger_ic_type())
+    {
+          rc = max77729_charger_iio_read_raw(indio_dev, chan, val1, val2, mask);
+    }
+    else
+    {
+          rc = nopmi_chg_iio_read_raw_internal(indio_dev, chan, val1, val2, mask);
+    }
+
+	*val1 = 0;
+
+	switch (chan->channel) {
+	case PSY_IIO_MTBF_CUR:
+		*val1 = chip->mtbf_cur;
+		break;
+        case PSY_IIO_CHARGE_IC_TYPE:
+                *val1 = chip->charge_ic_type;
+                break;
 	default:
 		pr_debug("Unsupported battery IIO chan %d\n", chan->channel);
 		rc = -EINVAL;
@@ -2502,8 +2565,9 @@ static int nopmi_chg_iio_of_xlate(struct iio_dev *indio_dev,
 static const struct iio_info nopmi_chg_iio_info = {
 	.read_raw	= nopmi_chg_iio_read_raw,
 	.write_raw	= nopmi_chg_iio_write_raw,
-	.of_xlate	= nopmi_chg_iio_of_xlate,
+        .of_xlate       = nopmi_chg_iio_of_xlate,
 };
+
 static int nopmi_init_iio_psy(struct nopmi_chg *chip)
 {
 	struct iio_dev *indio_dev = chip->indio_dev;

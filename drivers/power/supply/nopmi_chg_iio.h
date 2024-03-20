@@ -32,7 +32,7 @@ struct nopmi_chg_iio_channels {
 		BIT(IIO_CHAN_INFO_PROCESSED))
 
 static const struct nopmi_chg_iio_channels  nopmi_chg_iio_psy_channels[] = {
-	NOPMI_CHG_CHAN_ENERGY("battery_charging_enabled", PSY_IIO_CHARGING_ENABLED)
+	NOPMI_CHG_CHAN_ENERGY("battery_charging_enabled",  PSY_IIO_BATTERY_CHARGING_ENABLED)
 	NOPMI_CHG_CHAN_ENERGY("pd_active", PSY_IIO_PD_ACTIVE)
 	NOPMI_CHG_CHAN_ENERGY("pd_usb_suspend_supported", PSY_IIO_PD_USB_SUSPEND_SUPPORTED)
 	NOPMI_CHG_CHAN_ENERGY("pd_in_hard_reset", PSY_IIO_PD_IN_HARD_RESET)
@@ -47,6 +47,7 @@ static const struct nopmi_chg_iio_channels  nopmi_chg_iio_psy_channels[] = {
 	NOPMI_CHG_CHAN_ENERGY("apdo_volt", PSY_IIO_APDO_VOLT)
 	NOPMI_CHG_CHAN_ENERGY("apdo_curr", PSY_IIO_APDO_CURR)
 	NOPMI_CHG_CHAN_ENERGY("nopmi_charge_ic", PSY_IIO_CHARGE_IC_TYPE)
+	NOPMI_CHG_CHAN_ENERGY("charging_enabled", PSY_IIO_CHARGING_ENABLED)
 	NOPMI_CHG_CHAN_ENERGY("ffc_disable", PSY_IIO_FFC_DISABLE)
 };
 
