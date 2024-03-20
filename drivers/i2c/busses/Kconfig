@@ -1442,3 +1442,10 @@ config I2C_VIRTIO
           will be called i2c-virtio.
 
 endmenu
+
+config ENABLE_RECOVERY_GPIO
+    bool "Enable recovery GPIO support"
+    default n
+    help
+      Enable support for recovery GPIO. Select this option if your
+      platform supports recovery GPIO functionality.
