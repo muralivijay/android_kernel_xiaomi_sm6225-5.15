@@ -10,6 +10,7 @@
 #include <dt-bindings/iio/qti_power_supply_iio.h>
 #include <linux/qti_power_supply.h>
 
+#if 0 //Enable it when not use nopmi_chg
 struct max77729_charger_iio_channels {
 	const char *datasheet_name;
 	int channel_num;
@@ -39,6 +40,7 @@ static const struct max77729_charger_iio_channels max77729_charger_iio_psy_chann
 	MAX77729_CHARGER_CHAN_CURRENT("typec_mode", PSY_IIO_TYPEC_MODE)
 	MAX77729_CHARGER_CHAN_CURRENT("charging_enabled", PSY_IIO_CHARGING_ENABLED)
 };
+#endif
 
 enum fg_ext_iio_channels {
 	FG_FASTCHARGE_MODE,
