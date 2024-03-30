@@ -1447,3 +1447,5 @@ err_irq:
 	kfree(pd_data);
 	return ret;
 }
+
+MODULE_LICENSE("GPL");

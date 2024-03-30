@@ -463,3 +463,5 @@ err_irq:
 	return ret;
 
 }
+
+MODULE_LICENSE("GPL");

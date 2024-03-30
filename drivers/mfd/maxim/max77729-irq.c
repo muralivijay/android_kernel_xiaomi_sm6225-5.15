@@ -457,3 +457,5 @@ void max77729_irq_exit(struct max77729_dev *max77729)
 	if (max77729->irq)
 		free_irq(max77729->irq, max77729);
 }
+
+MODULE_LICENSE("GPL");

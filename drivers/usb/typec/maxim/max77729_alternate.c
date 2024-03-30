@@ -913,3 +913,5 @@ void max77729_set_enable_alternate_mode(int mode)
 		}
 	}
 }
+
+MODULE_LICENSE("GPL");

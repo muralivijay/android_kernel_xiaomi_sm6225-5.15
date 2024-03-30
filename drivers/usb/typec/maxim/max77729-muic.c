@@ -454,3 +454,5 @@ int max77729_muic_resume(struct max77729_usbc_platform_data *usbc_data)
 
 	return 0;
 }
+
+MODULE_LICENSE("GPL");
