@@ -95,6 +95,7 @@ static const unsigned int extcon_cable[] = {
 };
 
 struct max77729_usbc_platform_data *g_usbc_data;
+EXPORT_SYMBOL_GPL(g_usbc_data);
 static struct class *max_adapter_class;
 int vdm_count;
 
@@ -632,6 +633,8 @@ void max77729_rerun_chgdet(struct max77729_usbc_platform_data *usbpd_data)
 	write_data.read_length = 2;
 	max77729_usbc_opcode_write(usbpd_data, &write_data);
 }
+EXPORT_SYMBOL(max77729_rerun_chgdet);
+
 void max77729_send_new_srccap(struct max77729_usbc_platform_data *usbpd_data, int idx)
 {
 	usbc_cmd_data write_data;
@@ -654,6 +657,7 @@ void max77729_send_new_srccap(struct max77729_usbc_platform_data *usbpd_data, in
 	write_data.read_length = 2;
 	max77729_usbc_opcode_write(usbpd_data, &write_data);
 }
+EXPORT_SYMBOL(max77729_send_new_srccap);
 
 static int max77729_pd_get_svid(struct max77729_usbc_platform_data *usbc_data)
 {
@@ -1026,6 +1030,7 @@ int max77729_get_pd_support(struct max77729_usbc_platform_data *usbc_data)
 
 	return usbc_data->pwr_opmode;
 }
+EXPORT_SYMBOL(max77729_get_pd_support);
 
 static int max77729_firmware_update_sys(struct max77729_usbc_platform_data *data, int fw_dir)
 {
@@ -1763,6 +1768,7 @@ void init_usbc_cmd_data(usbc_cmd_data *cmd_data)
 	memset(cmd_data->write_data, REG_NONE, OPCODE_DATA_LENGTH);
 	memset(cmd_data->read_data, REG_NONE, OPCODE_DATA_LENGTH);
 }
+EXPORT_SYMBOL(init_usbc_cmd_data);
 
 static void init_usbc_cmd_node(usbc_cmd_node *usbc_cmd_node)
 {
@@ -2385,6 +2391,7 @@ void max77729_usbc_clear_queue(struct max77729_usbc_platform_data *usbc_data)
 	/* also clear fw opcode queue to sync with driver */
 	max77729_usbc_clear_fw_queue(usbc_data);
 }
+EXPORT_SYMBOL(max77729_usbc_clear_queue);
 
 static void max77729_usbc_cmd_run(struct max77729_usbc_platform_data *usbc_data)
 {
@@ -2483,7 +2490,7 @@ void max77729_usbc_opcode_write(struct max77729_usbc_platform_data *usbc_data,
 	}
 	mutex_unlock(&usbc_data->op_lock);
 }
-
+EXPORT_SYMBOL(max77729_usbc_opcode_write);
 
 void max77729_usbc_opcode_write_immediately(struct max77729_usbc_platform_data *usbc_data,
 	usbc_cmd_data *write_op)
@@ -2693,6 +2700,7 @@ void max77729_usbc_opcode_push(struct max77729_usbc_platform_data *usbc_data,
 	msg_maxim("P->P opcode[0x%02x] write_length[%d] read_length[%d]",
 		read_op->opcode, read_op->write_length, read_op->read_length);
 }
+EXPORT_SYMBOL(max77729_usbc_opcode_push);
 
 void max77729_usbc_opcode_rw(struct max77729_usbc_platform_data *usbc_data,
 	usbc_cmd_data *read_op, usbc_cmd_data *write_op)

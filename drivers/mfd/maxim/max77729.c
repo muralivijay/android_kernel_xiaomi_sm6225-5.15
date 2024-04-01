@@ -18,6 +18,8 @@
  *
  */
 
+#include <linux/version.h>
+#include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/i2c.h>
@@ -56,7 +58,9 @@ static struct mfd_cell max77729_devs[] = {
 	{ .name = "max77729-charger", },
 };
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 extern char nopmi_set_charger_ic_type(NOPMI_CHARGER_IC_TYPE nopmi_type);
+#endif
 
 int max77729_read_reg(struct i2c_client *i2c, u8 reg, u8 *dest)
 {
@@ -860,7 +864,9 @@ static int max77729_i2c_probe(struct i2c_client *i2c,
 	}
 	max77729->pmic_ver = ((pmic_rev & 0xF8) >> 0x3);
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 	nopmi_set_charger_ic_type(NOPMI_CHARGER_IC_MAXIM);
+#endif
 
 	/* print rev */
 	pr_info("%s:%s device found: rev:%x ver:%x\n",

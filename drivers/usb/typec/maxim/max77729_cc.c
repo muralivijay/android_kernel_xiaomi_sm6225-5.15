@@ -463,5 +463,6 @@ err_irq:
 	return ret;
 
 }
+EXPORT_SYMBOL(max77729_cc_init);
 
 MODULE_LICENSE("GPL");

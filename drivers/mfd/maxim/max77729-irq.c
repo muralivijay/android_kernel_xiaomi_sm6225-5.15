@@ -451,11 +451,13 @@ int max77729_irq_init(struct max77729_dev *max77729)
 
 	return 0;
 }
+EXPORT_SYMBOL(max77729_irq_init);
 
 void max77729_irq_exit(struct max77729_dev *max77729)
 {
 	if (max77729->irq)
 		free_irq(max77729->irq, max77729);
 }
+EXPORT_SYMBOL(max77729_irq_exit);
 
 MODULE_LICENSE("GPL");

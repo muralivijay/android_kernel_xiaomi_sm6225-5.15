@@ -2314,6 +2314,7 @@ int max77729_usb_get_property(struct power_supply *psy,
 
 	return rc;
 }
+EXPORT_SYMBOL(max77729_usb_get_property);
 
 int max77729_usb_set_property(struct power_supply *psy,
 		enum power_supply_property psp,
@@ -2386,6 +2387,7 @@ int max77729_usb_set_property(struct power_supply *psy,
 
 	return rc;
 }
+EXPORT_SYMBOL(max77729_usb_set_property);
 
 int otg_prop_is_writeable(struct power_supply *psy,
 		enum power_supply_property psp)
@@ -2554,6 +2556,8 @@ int max77729_batt_get_property(struct power_supply *psy,
 	}
 	return rc;
 }
+EXPORT_SYMBOL(max77729_batt_get_property);
+
 #if 0
 static int max77729_set_prop_system_temp_level(struct max77729_charger_data *chg,
 				const union power_supply_propval *val)
@@ -2666,6 +2670,7 @@ int max77729_batt_set_property(struct power_supply *psy,
 
 	return rc;
 }
+EXPORT_SYMBOL(max77729_batt_set_property);
 
 int batt_prop_is_writeable(struct power_supply *psy,
 		enum power_supply_property psp)
@@ -2686,6 +2691,8 @@ int batt_prop_is_writeable(struct power_supply *psy,
 
 	return 0;
 }
+EXPORT_SYMBOL(batt_prop_is_writeable);
+
 static int max77729_debugfs_show(struct seq_file *s, void *data)
 {
 	struct max77729_charger_data *charger = s->private;
@@ -4291,6 +4298,7 @@ int max77729_charger_iio_read_raw(struct iio_dev *indio_dev,
 
 	return IIO_VAL_INT;
 }
+EXPORT_SYMBOL(max77729_charger_iio_read_raw);
 
 int max77729_charger_iio_write_raw(struct iio_dev *indio_dev,
 		struct iio_chan_spec const *chan, int val1,
@@ -4368,6 +4376,7 @@ int max77729_charger_iio_write_raw(struct iio_dev *indio_dev,
 			chan->channel, rc);
 	return rc;
 }
+EXPORT_SYMBOL(max77729_charger_iio_write_raw);
 
 // Enable it when don,t use nopmi_chg
 #if 0

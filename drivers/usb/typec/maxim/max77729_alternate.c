@@ -145,6 +145,7 @@ int max77729_process_check_accessory(void *data)
 {
 	return 1;
 }
+EXPORT_SYMBOL(max77729_process_check_accessory);
 
 void max77729_vdm_process_printf(char *type, char *vdm_data, int len)
 {
@@ -173,6 +174,7 @@ void max77729_vdm_process_set_identity_req_push(void *data)
 	write_data.read_length = OPCODE_SIZE + OPCODE_HEADER_SIZE + vdm_header_num + vdo0_num;
 	max77729_usbc_opcode_push(usbpd_data, &write_data);
 }
+EXPORT_SYMBOL(max77729_vdm_process_set_identity_req_push);
 
 void max77729_vdm_process_set_identity_req(void *data)
 {
@@ -191,6 +193,7 @@ void max77729_vdm_process_set_identity_req(void *data)
 	write_data.read_length = OPCODE_SIZE + OPCODE_HEADER_SIZE + vdm_header_num + vdo0_num;
 	max77729_usbc_opcode_write(usbpd_data, &write_data);
 }
+EXPORT_SYMBOL(max77729_vdm_process_set_identity_req);
 
 void max77729_vdm_process_set_DP_enter_mode_req(void *data)
 {
@@ -224,7 +227,7 @@ void max77729_vdm_process_set_DP_configure_mode_req(void *data, uint8_t W_DATA)
 	write_data.read_length = OPCODE_SIZE + OPCODE_HEADER_SIZE + vdm_header_num + vdo0_num;
 	max77729_usbc_opcode_push(usbpd_data, &write_data);
 }
-
+EXPORT_SYMBOL(max77729_vdm_process_set_DP_configure_mode_req);
 
 static int max77729_vdm_process_discover_svids(void *data, char *vdm_data, int len)
 {
@@ -558,6 +561,7 @@ void max77729_vdm_message_handler(struct max77729_usbc_platform_data *usbpd_data
 		break;
 	}
 }
+EXPORT_SYMBOL(max77729_vdm_message_handler);
 
 static int max77729_process_discover_identity(void *data)
 {
@@ -772,6 +776,8 @@ DISCOVER_MODES:
 
 	max77729_process_alternate_mode(usbpd_data);
 }
+EXPORT_SYMBOL(max77729_receive_alternate_message);
+
 void max77729_vdm_process_set_alternate_mode(void *data, int mode)
 {
 	struct max77729_usbc_platform_data *usbpd_data = data;
@@ -913,5 +919,6 @@ void max77729_set_enable_alternate_mode(int mode)
 		}
 	}
 }
+EXPORT_SYMBOL(max77729_set_enable_alternate_mode);
 
 MODULE_LICENSE("GPL");

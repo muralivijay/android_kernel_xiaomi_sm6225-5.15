@@ -145,6 +145,7 @@ int com_to_usb_ap(struct max77729_muic_data *muic_data)
 
 	return ret;
 }
+EXPORT_SYMBOL(com_to_usb_ap);
 
 static void max77729_process_pd(struct max77729_usbc_platform_data *usbc_data)
 {
@@ -193,6 +194,7 @@ void max77729_select_pdo(int num)
 	pr_info("%s : OPCODE(0x%02x) W_LENGTH(%d) R_LENGTH(%d) NUM(%d)\n",
 		__func__, value.opcode, value.write_length, value.read_length, num);
 }
+EXPORT_SYMBOL(max77729_select_pdo);
 
 void max77729_response_pdo_request(struct max77729_usbc_platform_data *usbc_data,
 		unsigned char *data)
@@ -259,6 +261,7 @@ void max77729_response_set_pps(struct max77729_usbc_platform_data *usbc_data,
 	pr_info("%s : PPS_%s (0x%02X)\n",
 		__func__, usbc_data->pd_data->bPPS_on ? "On" : "Off", result);
 }
+EXPORT_SYMBOL(max77729_response_set_pps);
 
 void max77729_response_apdo_request(struct max77729_usbc_platform_data *usbc_data,
 		unsigned char *data)
@@ -309,6 +312,7 @@ void max77729_response_apdo_request(struct max77729_usbc_platform_data *usbc_dat
 		queue_delayed_work(usbc_data->pd_data->wqueue, &usbc_data->pd_data->retry_work, 0);
 	}
 }
+EXPORT_SYMBOL(max77729_response_apdo_request);
 
 int max77729_select_pps(int num, int ppsVol, int ppsCur)
 {
@@ -376,6 +380,7 @@ int max77729_select_pps(int num, int ppsVol, int ppsCur)
 /* [dchg] TODO: add return value */
 	return 0;
 }
+EXPORT_SYMBOL(max77729_select_pps);
 
 void max77729_pd_retry_work(struct work_struct *work)
 {
@@ -553,6 +558,7 @@ void max77729_vbus_turn_on_ctrl(struct max77729_usbc_platform_data *usbc_data, b
 		}
 	}
 }
+EXPORT_SYMBOL(max77729_vbus_turn_on_ctrl);
 
 void max77729_pdo_list(struct max77729_usbc_platform_data *usbc_data, unsigned char *data)
 {
@@ -619,6 +625,7 @@ void max77729_pdo_list(struct max77729_usbc_platform_data *usbc_data, unsigned c
 	/* if (do_power_nego) */
 		/* set_pd_active(usbc_data, pd_data->pd_noti.sink_status.has_apdo ? 2 : 1); */
 }
+EXPORT_SYMBOL(max77729_pdo_list);
 
 void max77729_current_pdo(struct max77729_usbc_platform_data *usbc_data, unsigned char *data)
 {
@@ -742,6 +749,7 @@ void max77729_current_pdo(struct max77729_usbc_platform_data *usbc_data, unsigne
 	 if (do_power_nego)
 		set_pd_active(usbc_data, pd_data->pd_noti.sink_status.has_apdo ? 2 : 1);
 }
+EXPORT_SYMBOL(max77729_current_pdo);
 
 POWER_LIST* usbpd_fetch_pdo(void)
 {
@@ -789,6 +797,7 @@ void max77729_detach_pd(struct max77729_usbc_platform_data *usbc_data)
 		usbc_data->uvdm_state = 0;
 	}
 }
+EXPORT_SYMBOL(max77729_detach_pd);
 
 static void max77729_notify_prswap(struct max77729_usbc_platform_data *usbc_data, u8 pd_msg)
 {
@@ -866,6 +875,7 @@ void max77729_notify_rp_current_level(struct max77729_usbc_platform_data *usbc_d
 	/* psy_do_property("bms", set, POWER_SUPPLY_EXT_PROP_CHARGING_ENABLED, val); */
 
 }
+EXPORT_SYMBOL(max77729_notify_rp_current_level);
 
 static int max77729_get_chg_info(struct max77729_usbc_platform_data *usbc_data)
 {
@@ -1156,6 +1166,7 @@ void stop_usb_host(void *data)
 	struct max77729_usbc_platform_data *usbc_data = data;
 	extcon_set_state_sync(usbc_data->extcon, EXTCON_USB_HOST, 0);
 }
+EXPORT_SYMBOL(stop_usb_host);
 
 void start_usb_host(void *data, bool ss)
 {
@@ -1186,6 +1197,7 @@ void stop_usb_peripheral(void *data)
 	struct max77729_usbc_platform_data *usbc_data = data;
 	extcon_set_state_sync(usbc_data->extcon, EXTCON_USB, 0);
 }
+EXPORT_SYMBOL(stop_usb_peripheral);
 
 void start_usb_peripheral(void *data)
 {
@@ -1208,6 +1220,7 @@ void start_usb_peripheral(void *data)
 
 	extcon_set_state_sync(usbc_data->extcon, EXTCON_USB, 1);
 }
+EXPORT_SYMBOL(start_usb_peripheral);
 
 void max77729_typec_role(void *data, int datarole)
 {
@@ -1447,5 +1460,6 @@ err_irq:
 	kfree(pd_data);
 	return ret;
 }
+EXPORT_SYMBOL(max77729_pd_init);
 
 MODULE_LICENSE("GPL");

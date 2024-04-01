@@ -7,6 +7,7 @@
 #include <linux/debugfs.h>
 #include <linux/ipc_logging.h>
 #include <linux/printk.h>
+#include <linux/usb/typec/maxim/max77729_usbc.h> //MAXIM-IC
 
 #define PROBE_CNT_MAX	100
 #define MAIN_CHG_SUSPEND_VOTER "MAIN_CHG_SUSPEND_VOTER"
@@ -69,6 +70,7 @@ BATT_DEV_ID_MFR batt_dev_id_mfr[] = {
 
 extern bool g_ffc_disable;
 extern int adapter_dev_get_pd_verified(void);
+extern struct max77729_usbc_platform_data *g_usbc_data; //MAXIM-IC
 
 static const int NOPMI_CHG_WORKFUNC_GAP = 10000;
 static const int NOPMI_CHG_CV_STEP_MONITOR_WORKFUNC_GAP = 2000;
@@ -533,7 +535,9 @@ static ssize_t pd_verifed_show(struct class *c,
 {
 	int pd_verifed = 0;
 
-	if (NOPMI_CHARGER_IC_SYV == nopmi_get_charger_ic_type())
+	if (NOPMI_CHARGER_IC_MAXIM == nopmi_get_charger_ic_type())
+		pd_verifed = g_usbc_data->verifed;
+	else if(NOPMI_CHARGER_IC_SYV == nopmi_get_charger_ic_type())
 		pd_verifed = adapter_dev_get_pd_verified();
 	else
 		pd_verifed = 1;
@@ -726,6 +730,7 @@ static struct attribute *battery_class_attrs[] = {
         &class_attr_fg_batt_id.attr,
         &class_attr_mtbf_current.attr,
         &class_attr_cycle_count_select.attr,
+        &class_attr_pd_verifed.attr,
         NULL,
 };
 ATTRIBUTE_GROUPS(battery_class);
@@ -785,7 +790,6 @@ static int nopmi_chg_init_dev_class(struct nopmi_chg *chg)
           battery_class_attrs[num_attributes++] = &class_attr_typec_cc_orientation.attr;
           battery_class_attrs[num_attributes++] = &class_attr_typec_mode.attr;
           battery_class_attrs[num_attributes++] = &class_attr_resistance_id.attr;
-          battery_class_attrs[num_attributes++] = &class_attr_pd_verifed.attr;
           battery_class_attrs[num_attributes++] = &class_attr_apdo_max.attr;
           battery_class_attrs[num_attributes++] = &class_attr_real_type.attr;
        }

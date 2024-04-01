@@ -435,6 +435,8 @@ err_irq:
 err_return:
 	return ret;
 }
+EXPORT_SYMBOL(max77729_bc12_probe);
+
 int max77729_muic_suspend(struct max77729_usbc_platform_data *usbc_data)
 {
 	struct max77729_muic_data *muic_data = usbc_data->muic_data;
@@ -444,6 +446,7 @@ int max77729_muic_suspend(struct max77729_usbc_platform_data *usbc_data)
 
 	return 0;
 }
+EXPORT_SYMBOL(max77729_muic_suspend);
 
 int max77729_muic_resume(struct max77729_usbc_platform_data *usbc_data)
 {
@@ -454,5 +457,6 @@ int max77729_muic_resume(struct max77729_usbc_platform_data *usbc_data)
 
 	return 0;
 }
+EXPORT_SYMBOL(max77729_muic_resume);
 
 MODULE_LICENSE("GPL");
