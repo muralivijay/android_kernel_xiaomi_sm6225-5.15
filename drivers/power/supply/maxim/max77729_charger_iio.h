@@ -52,14 +52,16 @@ static const char * const fg_ext_iio_chan_name[] = {
 	[FG_RESISTANCE_ID] = "resistance_id",
 };
 
-enum max77729_chg_ext_iio_channels {
-	MAX77729_CHG_MTBF_CUR,
-	MAX77729_CHG_USB_REAL_TYPE,
+enum nopmi_chg_ext_iio_channels {
+	NOPMI_CHG_MTBF_CUR,
+	NOPMI_CHG_USB_REAL_TYPE,
+	NOPMI_CHG_FFC_DISABLE,
 };
 
-static const char * const max77729_chg_ext_iio_chan_name[] = {
-	[MAX77729_CHG_MTBF_CUR] = "mtbf_cur",
-	[MAX77729_CHG_USB_REAL_TYPE] = "usb_real_type",
+static const char * const nopmi_chg_ext_iio_chan_name[] = {
+	[NOPMI_CHG_MTBF_CUR] = "mtbf_cur",
+	[NOPMI_CHG_USB_REAL_TYPE] = "usb_real_type",
+	[NOPMI_CHG_FFC_DISABLE] = "ffc_disable"
 };
 
 enum ds_ext_iio_channels {

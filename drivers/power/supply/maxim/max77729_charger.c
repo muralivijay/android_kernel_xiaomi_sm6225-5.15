@@ -62,9 +62,9 @@
 extern int factory_mode;
 /*maxim glabal usbc struct for battery and usb psy status*/
 extern struct max77729_usbc_platform_data *g_usbc_data;
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 /* extern bool for ffc status check in jeita*/
 extern bool g_ffc_disable;
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 #if defined(CONFIG_NOPMI_CHARGER)
 #else
 extern int get_prop_battery_charging_enabled(struct votable *usb_icl_votable,
@@ -205,7 +205,11 @@ static int max77729_set_fast_charge_mode(struct max77729_charger_data *charger, 
 		The temp is normal set fastcharge mode as 1 and jeita loop also handle fastcharge prop*/
 	//pr_err("%s: batt_verify: %d, batt_soc: %d, batt_temp: %d",__func__, batt_verify, batt_soc, batt_temp);
 	if ((pd_active == 2) && batt_verify && batt_soc < 95){
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 		g_ffc_disable = false;
+#else
+		max77729_charger_set_iio_channel(charger,  MAXIM_NOPMI, NOPMI_CHG_FFC_DISABLE, false);
+#endif
 		if(batt_temp >= 150 && batt_temp <= 480){
 			prop.intval = 1;
 		}else{
@@ -214,7 +218,11 @@ static int max77729_set_fast_charge_mode(struct max77729_charger_data *charger, 
 	}else{
 		/*If TA plug in without PPS, battery auth fail and soc exceed 95%, FFC will always be disabled*/
 		prop.intval = 0;
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 		g_ffc_disable = true;
+#else
+                max77729_charger_set_iio_channel(charger,  MAXIM_NOPMI, NOPMI_CHG_FFC_DISABLE, true);
+#endif
 	}
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
@@ -3018,7 +3026,7 @@ static void max77729_chgin_isr_work(struct work_struct *work)
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
  			psy_do_property("usb", set, POWER_SUPPLY_PROP_REAL_TYPE, value);
 #else
- 			max77729_charger_set_iio_channel(charger, MAX77729_CHG_USB, MAX77729_CHG_USB_REAL_TYPE, value.intval);
+ 			max77729_charger_set_iio_channel(charger, MAXIM_NOPMI, NOPMI_CHG_USB_REAL_TYPE, value.intval);
 #endif
 	if (!charger->psy_usb) {
 		charger->psy_usb = power_supply_get_by_name("usb");
@@ -3287,7 +3295,7 @@ static void max77729_notify_work(struct work_struct *work)
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 		power_supply_get_property(charger->psy_usb, POWER_SUPPLY_PROP_MTBF_CUR, &pval);
 #else
-		max77729_charger_get_iio_channel(charger, MAX77729_CHG_USB, MAX77729_CHG_MTBF_CUR, &pval.intval);
+		max77729_charger_get_iio_channel(charger, MAXIM_NOPMI, NOPMI_CHG_MTBF_CUR, &pval.intval);
 #endif
 		mtbf_cur = pval.intval;
 		if (input_curr_limit <= 1000 && mtbf_cur >= 1500){
@@ -3483,7 +3491,7 @@ static void max77729_adapter_changed_work(struct work_struct *work)
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 			psy_do_property("usb", set, POWER_SUPPLY_PROP_REAL_TYPE, value);
 #else
-			max77729_charger_set_iio_channel(charger, MAX77729_CHG_USB, MAX77729_CHG_USB_REAL_TYPE, value.intval);
+			max77729_charger_set_iio_channel(charger, MAXIM_NOPMI, NOPMI_CHG_USB_REAL_TYPE, value.intval);
 #endif
 		if (charger->pd_active != g_usbc_data->pd_active) {
 			charger->pd_active = g_usbc_data->pd_active;
@@ -4094,24 +4102,24 @@ static bool is_bms_chan_valid(struct max77729_charger_data *chip,
 }
 
 /* NOPMI Channel validate */
-static bool is_max77729_chg_chan_valid(struct max77729_charger_data *chip,
-		enum max77729_chg_ext_iio_channels chan)
+static bool is_nopmi_chg_chan_valid(struct max77729_charger_data *chip,
+		enum nopmi_chg_ext_iio_channels chan)
 {
 	int rc;
 
-	if (IS_ERR(chip->max77729_chg_ext_iio_chans[chan]))
+	if (IS_ERR(chip->nopmi_chg_ext_iio_chans[chan]))
 		return false;
 
-	if (!chip->max77729_chg_ext_iio_chans[chan]) {
-		chip->max77729_chg_ext_iio_chans[chan] = iio_channel_get(chip->dev,
-					max77729_chg_ext_iio_chan_name[chan]);
-		if (IS_ERR(chip->max77729_chg_ext_iio_chans[chan])) {
-			rc = PTR_ERR(chip->max77729_chg_ext_iio_chans[chan]);
+	if (!chip->nopmi_chg_ext_iio_chans[chan]) {
+		chip->nopmi_chg_ext_iio_chans[chan] = iio_channel_get(chip->dev,
+					nopmi_chg_ext_iio_chan_name[chan]);
+		if (IS_ERR(chip->nopmi_chg_ext_iio_chans[chan])) {
+			rc = PTR_ERR(chip->nopmi_chg_ext_iio_chans[chan]);
 			if (rc == -EPROBE_DEFER)
-				chip->max77729_chg_ext_iio_chans[chan] = NULL;
+				chip->nopmi_chg_ext_iio_chans[chan] = NULL;
 
 			pr_err("Failed to get IIO channel %s, rc=%d\n",
-				max77729_chg_ext_iio_chan_name[chan], rc);
+				nopmi_chg_ext_iio_chan_name[chan], rc);
 			return false;
 		}
 	}
@@ -4158,10 +4166,10 @@ int max77729_charger_get_iio_channel(struct max77729_charger_data *chg,
 			return -ENODEV;
 		iio_chan_list = chg->fg_ext_iio_chans[channel];
 		break;
-	case MAX77729_CHG_USB:
-		if (!is_max77729_chg_chan_valid(chg, channel))
+	case MAXIM_NOPMI:
+		if (!is_nopmi_chg_chan_valid(chg, channel))
 			return -ENODEV;
-		iio_chan_list = chg->max77729_chg_ext_iio_chans[channel];
+		iio_chan_list = chg->nopmi_chg_ext_iio_chans[channel];
 		break;
 	case MAX77729_CHG_MAIN:
 		if (!is_main_chan_valid(chg, channel))
@@ -4193,10 +4201,10 @@ int max77729_charger_set_iio_channel(struct max77729_charger_data *chg,
 			return -ENODEV;
 		iio_chan_list = chg->fg_ext_iio_chans[channel];
 		break;
-	case MAX77729_CHG_USB:
-		if (!is_max77729_chg_chan_valid(chg, channel))
+	case MAXIM_NOPMI:
+		if (!is_nopmi_chg_chan_valid(chg, channel))
 			return -ENODEV;
-		iio_chan_list = chg->max77729_chg_ext_iio_chans[channel];
+		iio_chan_list = chg->nopmi_chg_ext_iio_chans[channel];
 		break;
 	case MAX77729_CHG_MAIN:
 		if (!is_main_chan_valid(chg, channel))
@@ -4466,9 +4474,9 @@ static int max77729_charger_ext_init_iio_psy(struct max77729_charger_data *chip)
 	if (!chip->fg_ext_iio_chans)
 		return -ENOMEM;
 
-	chip->max77729_chg_ext_iio_chans = devm_kcalloc(chip->dev,
-		        ARRAY_SIZE(max77729_chg_ext_iio_chan_name), sizeof(*chip->max77729_chg_ext_iio_chans), GFP_KERNEL);
-	if (!chip->max77729_chg_ext_iio_chans)
+	chip->nopmi_chg_ext_iio_chans = devm_kcalloc(chip->dev,
+		        ARRAY_SIZE(nopmi_chg_ext_iio_chan_name), sizeof(*chip->nopmi_chg_ext_iio_chans), GFP_KERNEL);
+	if (!chip->nopmi_chg_ext_iio_chans)
 		return -ENOMEM;
 
 	chip->main_iio = devm_kcalloc(chip->dev,

@@ -399,7 +399,7 @@ struct max77729_charger_data {
 	struct iio_chan_spec    *iio_chan;
 	struct iio_channel      *int_iio_chans;
 	struct iio_channel	**ds_ext_iio_chans;
-	struct iio_channel	**max77729_chg_ext_iio_chans;
+	struct iio_channel	**nopmi_chg_ext_iio_chans;
 	struct iio_channel	**fg_ext_iio_chans;
 	struct iio_channel	**main_iio;
 #endif
@@ -475,7 +475,7 @@ struct max77729_charger_data {
 enum max77729_charger_iio_type {
 	DS28E16,
 	MAX77729_CHG_BMS,
-	MAX77729_CHG_USB,
+	MAXIM_NOPMI,
 	MAX77729_CHG_MAIN,
 };
 #endif
