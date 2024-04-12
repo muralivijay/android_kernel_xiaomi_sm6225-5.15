@@ -38,6 +38,7 @@ static const struct max77729_fg_iio_channels max77729_fg_iio_psy_channels[] = {
 	MAX77729_FG_CHAN_CURRENT("fastcharge_mode", PSY_IIO_FASTCHARGE_MODE)
 	MAX77729_FG_CHAN_CURRENT("battery_type", PSY_IIO_BATTERY_TYPE)
 	MAX77729_FG_CHAN_CURRENT("soh", PSY_IIO_SOH)
+	MAX77729_FG_CHAN_CURRENT("charge_ic_type", PSY_IIO_CHARGE_IC_TYPE)
 };
 
 #endif

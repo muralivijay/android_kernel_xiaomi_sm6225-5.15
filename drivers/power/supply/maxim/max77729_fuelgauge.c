@@ -3246,6 +3246,9 @@ static int max77729_fg_iio_read_raw(struct iio_dev *indio_dev,
 	case PSY_IIO_SOH:
 		*val1 = max77729_fg_read_SoH(fuelgauge);
 		break;
+	case PSY_IIO_CHARGE_IC_TYPE:
+		*val1 = NOPMI_CHARGER_IC_MAXIM;
+		break;
 	default:
 		pr_info("Unsupported max77729_fg IIO chan %d\n", chan->channel);
 		rc = -EINVAL;
