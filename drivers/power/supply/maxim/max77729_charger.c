@@ -4386,8 +4386,6 @@ int max77729_charger_iio_write_raw(struct iio_dev *indio_dev,
 }
 EXPORT_SYMBOL(max77729_charger_iio_write_raw);
 
-// Enable it when don,t use nopmi_chg
-#if 0
 static int max77729_charger_iio_of_xlate(struct iio_dev *indio_dev,
 				const struct of_phandle_args *iiospec)
 {
@@ -4404,8 +4402,11 @@ static int max77729_charger_iio_of_xlate(struct iio_dev *indio_dev,
 }
 
 static const struct iio_info max77729_charger_iio_info = {
+// Enable it when don,t use nopmi_chg
+#if 0
 	.read_raw	= max77729_charger_iio_read_raw,
 	.write_raw	= max77729_charger_iio_write_raw,
+#endif
 	.of_xlate	= max77729_charger_iio_of_xlate,
 };
 
@@ -4462,7 +4463,6 @@ static int max77729_charger_init_iio_psy(struct max77729_charger_data *chip)
 
 	return rc;
 }
-#endif
 
 static int max77729_charger_ext_init_iio_psy(struct max77729_charger_data *chip)
 {
@@ -4597,13 +4597,11 @@ static int max77729_charger_probe(struct platform_device *pdev)
         goto err_free;
 	}
 
-#if 0 // Enable it when not use nopmi_chg
 	ret = max77729_charger_init_iio_psy(charger);
 	if (ret < 0) {
 		pr_err("Failed to initialize max77729_charger IIO PSY, ret=%d\n", ret);
 		goto err_free;
 	}
-#endif
 #endif
 
 	max77729_read_reg(charger->i2c, MAX77729_CHG_REG_INT_OK, &reg_data);
