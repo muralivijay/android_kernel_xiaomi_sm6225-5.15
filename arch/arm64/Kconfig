@@ -360,10 +360,8 @@ config KASAN_SHADOW_OFFSET
 source "arch/arm64/Kconfig.platforms"
 
 config TARGET_PROJECT_K7T
-        default n
-        tristate "Custom project for hardware K7T pcb"
-        help
-        Custom project for K7T pcb.
+        bool "Custom project for hardware K7T pcb"
+		default n
 
 menu "Kernel Features"
 
