@@ -10,7 +10,7 @@
 KERNEL_TOOLS=/workspace/kernel-build-tools/linux-x86/bin/
 # Clang from AOSP (r450784e) v14.0.7
 # URL = https://android.googlesource.com/platform//prebuilts/clang/host/linux-x86/+/722c840a8e4d58b5ebdab62ce78eacdafd301208/clang-r450784e
-CLANG_PATH=/workspace/prebuilts/clang/bin/
+CLANG_PATH=/workspace/clang/bin/
 
 export PATH="$KERNEL_TOOLS:$CLANG_PATH:$PATH"
 
