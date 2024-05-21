@@ -59,7 +59,7 @@ enum iio_psy_property {
 };
 
 static const char * const iio_channel_map[] = {
-        [MAX77729_USB_REAL_TYPE] = "real_type",
+        [MAX77729_USB_REAL_TYPE] = "usb_real_type",
 };
 
 static bool is_max77729_chan_valid(struct max77729_usb_data *chip,
