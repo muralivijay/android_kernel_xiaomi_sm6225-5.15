@@ -4568,7 +4568,7 @@ static int max77729_charger_probe(struct platform_device *pdev)
 	charger->cable_type = SEC_BATTERY_CABLE_NONE;
 	charger->in_suspend = false;
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(5, 4, 0))
         mutex_init(&charger->charger_mutex);
         mutex_init(&charger->mode_mutex);
 #endif
