@@ -3018,7 +3018,7 @@ static int max77729_fuelgauge_parse_dt(struct max77729_fuelgauge_data *fuelgauge
 			battery_id = fgauge_get_battery_id();
 #else
 			battery_id = fgauge_get_battery_id(fuelgauge);
-#endif			
+#endif
              /* pr_err("%s: reading battery_id = %d\n", */
 				/* __func__, battery_id); */
 		}
@@ -3362,6 +3362,7 @@ static int max77729_fg_init_iio_psy(struct max77729_fuelgauge_data *chip)
 	return rc;
 }
 
+
 static int max77729_fg_ext_init_iio_psy(struct max77729_fuelgauge_data *fuelgauge)
 {
 	if (!fuelgauge)
@@ -3394,13 +3395,11 @@ static int max77729_fuelgauge_probe(struct platform_device *pdev)
  	struct power_supply *max_verify_psy = NULL;
 #else
 	struct iio_dev *indio_dev = NULL;
-        struct iio_dev *indio_dev1 = NULL;
-	static probe_cnt = 0; 	
 #endif
 	int ret = 0;
 
 	pr_info("%s: max77729 Fuelgauge Driver Loading\n", __func__);
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))	
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 #ifdef CONFIG_BATT_VERIFY_BY_DS28E16
 	if (max77729_read_word(max77729->fuelgauge, STATUS_REG) & BIT(1)){         //if fg chip por flag set, should be wait for battery id from ds28e16
 		max_verify_psy = power_supply_get_by_name("batt_verify");
@@ -3422,42 +3421,26 @@ static int max77729_fuelgauge_probe(struct platform_device *pdev)
 	}
 
 	mutex_init(&fuelgauge->fg_lock);
-#else	
-	if (probe_cnt == 0) {
-		pr_err("%s enter !\n",__func__);
-	}
-
-	probe_cnt ++;
-
-	indio_dev = devm_iio_device_alloc(&pdev->dev, sizeof(*fuelgauge));
-
-	if (!indio_dev){
-		pr_err("Failed to allocate fuelgauge memory\n");
-		return -ENOMEM;
-	}
-
-        indio_dev1 = devm_iio_device_alloc(&pdev->dev, sizeof(max77729_fuelgauge_platform_data_t));
-
-        if (!indio_dev1){
-                pr_err("Failed to allocate fuelgauge platform memory\n");
+#else
+        indio_dev = devm_iio_device_alloc(&pdev->dev, sizeof(*fuelgauge));
+        if (!indio_dev) {
+               pr_err("Failed to allocate IIO device memory\n");
                 return -ENOMEM;
+        }
+
+        fuelgauge_data = devm_kzalloc(&pdev->dev, sizeof(max77729_fuelgauge_platform_data_t), GFP_KERNEL);
+        if (!fuelgauge_data) {
+                ret = -ENOMEM;
                 goto err_free;
         }
 
+#endif
 
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(5, 4, 0))
 	fuelgauge = iio_priv(indio_dev);
 	fuelgauge->indio_dev = indio_dev;
-        fuelgauge_data = iio_priv(indio_dev1);
-        fuelgauge_data->indio_dev1 = indio_dev1;
-        
-	max77729_fg_ext_init_iio_psy(fuelgauge);
-	if (!is_ds_chan_valid(fuelgauge, 0)) {
-		return -EPROBE_DEFER;
-	}        
-
-	mutex_init(&fuelgauge->fg_lock);
 #endif
-        
+
 	fuelgauge->dev = &pdev->dev;
 	fuelgauge->pdata = fuelgauge_data;
 	fuelgauge->i2c = max77729->fuelgauge;
@@ -3465,16 +3448,30 @@ static int max77729_fuelgauge_probe(struct platform_device *pdev)
 	fuelgauge->max77729_pdata = pdata;
 
 	fuelgauge->fake_temp = -EINVAL;
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 #ifdef CONFIG_BATT_VERIFY_BY_DS28E16
 	fuelgauge->max_verify_psy = max_verify_psy;
 #endif
+#endif
+        mutex_init(&fuelgauge->fg_lock);
+
 #if defined(CONFIG_OF)
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 	fuelgauge->battery_data = kzalloc(sizeof(struct battery_data_t), GFP_KERNEL);
 	if (!fuelgauge->battery_data) {
 		pr_err("Failed to allocate memory\n");
 		ret = -ENOMEM;
 		goto err_pdata_free;
 	}
+#else
+        fuelgauge->battery_data = devm_kzalloc(&pdev->dev, sizeof(struct battery_data_t), GFP_KERNEL);
+        if (!fuelgauge->battery_data) {
+                pr_err("Failed to allocate memory\n");
+                ret = -ENOMEM;
+                goto err_pdata_free;
+        }
+
+#endif
 	ret = max77729_fuelgauge_parse_dt(fuelgauge);
 	if (ret < 0)
 		pr_err("%s not found fg dt! ret[%d]\n", __func__, ret);
@@ -3482,6 +3479,11 @@ static int max77729_fuelgauge_probe(struct platform_device *pdev)
 
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(5, 4, 0))
 	INIT_DELAYED_WORK(&fuelgauge->retry_battery_id_work, retry_battery_id_func); //retry for get battery id
+
+        max77729_fg_ext_init_iio_psy(fuelgauge);
+        if (!is_ds_chan_valid(fuelgauge, 0)) {
+                return -EPROBE_DEFER;
+        }
 
 	ret = max77729_fg_init_iio_psy(fuelgauge);
 	if (ret < 0) {
@@ -3580,12 +3582,14 @@ err_supply_unreg:
 	wakeup_source_unregister(fuelgauge->fuel_alert_ws);
 err_data_free:
 #if defined(CONFIG_OF)
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 	kfree(fuelgauge->battery_data);
+#endif
 #endif
 err_pdata_free:
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 	kfree(fuelgauge_data);
-#endif	
+#endif
 	mutex_destroy(&fuelgauge->fg_lock);
 err_free:
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
@@ -3608,10 +3612,10 @@ static int max77729_fuelgauge_remove(struct platform_device *pdev)
 
 	free_irq(fuelgauge->fg_irq, fuelgauge);
 	wakeup_source_unregister(fuelgauge->fuel_alert_ws);
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 #if defined(CONFIG_OF)
 	kfree(fuelgauge->battery_data);
 #endif
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 	kfree(fuelgauge->pdata);
 	kfree(fuelgauge);
 #endif

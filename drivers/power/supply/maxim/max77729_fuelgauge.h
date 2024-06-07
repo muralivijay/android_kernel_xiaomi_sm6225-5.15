@@ -174,9 +174,6 @@ typedef struct max77729_fuelgauge_platform_data {
 	int jig_gpio;
 	int jig_low_active;
 
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(5, 4, 0))
-        struct iio_dev  *indio_dev1;
-#endif
 	int bat_id_gpio;
 
 	int thermal_source;
@@ -312,9 +309,10 @@ struct max77729_fuelgauge_data {
 	int *dec_rate_seq;
 	int dec_rate_len;
 
-
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 #ifdef CONFIG_BATT_VERIFY_BY_DS28E16
 	struct power_supply *max_verify_psy;
+#endif
 #endif
 
 #if defined(CONFIG_BATTERY_CISD)
