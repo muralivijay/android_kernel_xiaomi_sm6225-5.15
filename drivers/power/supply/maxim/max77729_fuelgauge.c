@@ -2734,6 +2734,7 @@ static int fgauge_get_battery_id(struct max77729_fuelgauge_data *fuelgauge)
 	return fuelgauge->batt_id;
 }
 
+#if 0
 static void retry_battery_id_func(struct work_struct *work)
 {
 	struct max77729_fuelgauge_data *fuelgauge = container_of(work,
@@ -2750,6 +2751,7 @@ static void retry_battery_id_func(struct work_struct *work)
 		pr_info(" Successfully get battery id: %d \n", batt_id);
 	}
 }
+#endif
 #endif
 
 static void max77729_fg_isr_work(struct work_struct *work)
@@ -3477,23 +3479,25 @@ static int max77729_fuelgauge_probe(struct platform_device *pdev)
 		pr_err("%s not found fg dt! ret[%d]\n", __func__, ret);
 #endif
 
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(5, 4, 0))
-	INIT_DELAYED_WORK(&fuelgauge->retry_battery_id_work, retry_battery_id_func); //retry for get battery id
-
-        max77729_fg_ext_init_iio_psy(fuelgauge);
-        if (!is_ds_chan_valid(fuelgauge, 0)) {
-                return -EPROBE_DEFER;
-        }
-
-	ret = max77729_fg_init_iio_psy(fuelgauge);
-	if (ret < 0) {
-		pr_err("Failed to initialize MAX77729_FG IIO PSY, ret=%d\n", ret);
-		goto err_free;
-	}
-#endif
 	platform_set_drvdata(pdev, fuelgauge);
 
 	max77729_fg_model_load(fuelgauge);
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+//      INIT_DELAYED_WORK(&fuelgauge->retry_battery_id_work, retry_battery_id_func); //retry for get battery id
+
+	ret = max77729_fg_ext_init_iio_psy(fuelgauge);
+	if (ret < 0) {
+		pr_err("Failed to initialize max77729_fg ext IIO PSY, ret=%d\n", ret);
+        goto err_free;
+	}
+
+	ret =  max77729_fg_init_iio_psy(fuelgauge);
+	if (ret < 0) {
+		pr_err("Failed to initialize max77729_fg IIO PSY, ret=%d\n", ret);
+		goto err_free;
+	}
+#endif
 
 	fuelgauge->capacity_max = fuelgauge->pdata->capacity_max;
 	fuelgauge->g_capacity_max = 0;
