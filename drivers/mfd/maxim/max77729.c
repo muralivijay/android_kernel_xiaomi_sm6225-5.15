@@ -32,6 +32,10 @@
 #include <linux/regulator/machine.h>
 #include <linux/delay.h>
 #include <linux/workqueue.h>
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(4, 19, 0))
+#include <linux/iio/iio.h>
+#include <linux/iio/consumer.h>
+#endif
 
 #include <linux/mfd/max77729_pass1.h>
 
@@ -785,14 +789,28 @@ static int max77729_i2c_probe(struct i2c_client *i2c,
 {
 	struct max77729_dev *max77729;
 	struct max77729_platform_data *pdata = i2c->dev.platform_data;
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(5, 4, 0))
+	struct iio_dev *indio_dev = NULL;
+#endif
 	int ret = 0;
 	u8 pmic_id, pmic_rev = 0;
 
 	/* pr_info("%s:%s\n", MFD_DEV_NAME, __func__); */
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 	max77729 = kzalloc(sizeof(struct max77729_dev), GFP_KERNEL);
 	if (!max77729)
 		return -ENOMEM;
+#else
+	indio_dev = devm_iio_device_alloc(&i2c->dev, sizeof(struct max77729_dev));
+
+	if (!indio_dev){
+		pr_err("Failed to allocate memory\n");
+		return -ENOMEM;
+	}
+	max77729 = iio_priv(indio_dev);
+	max77729->maxim_indio_dev = indio_dev;
+#endif
 
 	if (i2c->dev.of_node) {
 		pdata = devm_kzalloc(&i2c->dev, sizeof(struct max77729_platform_data),

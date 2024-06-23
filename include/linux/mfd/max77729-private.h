@@ -20,6 +20,7 @@
 #ifndef __LINUX_MFD_MAX77729_PRIV_H
 #define __LINUX_MFD_MAX77729_PRIV_H
 
+#include <linux/version.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
@@ -352,6 +353,9 @@ struct max77729_dev {
 	struct i2c_client *muic; /* 0x4A; MUIC */
 	struct i2c_client *debug; /* 0xC4; Debug */
 	struct mutex i2c_lock;
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(4, 19, 0))
+	struct iio_dev  *maxim_indio_dev;
+#endif
 
 	int type;
 
