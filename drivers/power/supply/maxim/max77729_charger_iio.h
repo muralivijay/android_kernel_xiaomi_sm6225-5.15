@@ -9,6 +9,16 @@
 #include <linux/iio/iio.h>
 #include <dt-bindings/iio/qti_power_supply_iio.h>
 #include <linux/qti_power_supply.h>
+#include "max77729_charger.h"
+
+struct max77729_charger_data_iio {
+        struct device           *dev;
+        struct max77729_charger_data *chg_data;
+        struct max77729_dev *max77729;
+        struct iio_dev  *indio_dev;
+        struct iio_chan_spec    *iio_chan;
+        struct iio_channel      *int_iio_chans;
+};
 
 struct max77729_charger_iio_channels {
 	const char *datasheet_name;
@@ -34,48 +44,11 @@ static const struct max77729_charger_iio_channels max77729_charger_iio_psy_chann
 	MAX77729_CHARGER_CHAN_CURRENT("battery_charging_enabled", PSY_IIO_BATTERY_CHARGING_ENABLED)
 	MAX77729_CHARGER_CHAN_CURRENT("input_suspend", PSY_IIO_INPUT_SUSPEND)
 	MAX77729_CHARGER_CHAN_CURRENT("usb_real_type", PSY_IIO_USB_REAL_TYPE)
-	MAX77729_CHARGER_CHAN_CURRENT("pd_active", PSY_IIO_PD_ACTIVE)
+	MAX77729_CHARGER_CHAN_CURRENT("charge_pd_active", PSY_IIO_PD_ACTIVE)
 	MAX77729_CHARGER_CHAN_CURRENT("typec_cc_orientation", PSY_IIO_TYPEC_CC_ORIENTATION)
 	MAX77729_CHARGER_CHAN_CURRENT("typec_mode", PSY_IIO_TYPEC_MODE)
 	MAX77729_CHARGER_CHAN_CURRENT("charging_enabled", PSY_IIO_CHARGING_ENABLED)
-};
-
-enum fg_ext_iio_channels {
-	FG_FASTCHARGE_MODE,
-	FG_RESISTANCE_ID,
-};
-
-static const char * const fg_ext_iio_chan_name[] = {
-	[FG_FASTCHARGE_MODE] = "fastcharge_mode",
-	[FG_RESISTANCE_ID] = "resistance_id",
-};
-
-enum nopmi_chg_ext_iio_channels {
-	NOPMI_CHG_MTBF_CUR,
-	NOPMI_CHG_USB_REAL_TYPE,
-	NOPMI_CHG_FFC_DISABLE,
-};
-
-static const char * const nopmi_chg_ext_iio_chan_name[] = {
-	[NOPMI_CHG_MTBF_CUR] = "mtbf_cur",
-	[NOPMI_CHG_USB_REAL_TYPE] = "usb_real_type",
-	[NOPMI_CHG_FFC_DISABLE] = "ffc_disable"
-};
-
-enum ds_ext_iio_channels {
-	DS_CHIP_OK,
-};
-
-static const char * const ds_ext_iio_chan_name[] = {
-	[DS_CHIP_OK] = "ds_chip_ok",
-};
-
-enum main_iio_channels {
-	MAIN_BATTERY_CHARGING_ENABLED,
-};
-
-static const char * const main_iio_chan_name[] = {
-	[MAIN_BATTERY_CHARGING_ENABLED] = "battery_charge_enabled",
+        MAX77729_CHARGER_CHAN_CURRENT("charge_ic_type", PSY_IIO_CHARGE_IC_TYPE)
 };
 
 #endif

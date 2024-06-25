@@ -1,3 +1,4 @@
+
 /*
  * Copyrights (C) 2021 Maxim Integrated Products, Inc.
  *
@@ -15,12 +16,6 @@
 #include <linux/debugfs.h>
 #include <linux/seq_file.h>
 #include <linux/power_supply.h>
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(4, 19, 0))
-#include <linux/qti_power_supply.h>
-#include "max77729_charger_iio.h"
-#include <linux/iio/consumer.h>
-#include <dt-bindings/iio/qti_power_supply_iio.h>
-#endif
 #include <linux/mfd/max77729.h>
 #include <linux/of_gpio.h>
 #include <linux/usb/typec/maxim/max77729-muic.h>
@@ -58,6 +53,9 @@
 
 #define NOTIFY_COUNT_MAX		40
 
+struct max77729_charger_data *charger;
+EXPORT_SYMBOL(charger);
+
 /* extern unsigned int lpcharge; */
 extern int factory_mode;
 /*maxim glabal usbc struct for battery and usb psy status*/
@@ -67,10 +65,10 @@ extern struct max77729_usbc_platform_data *g_usbc_data;
 extern bool g_ffc_disable;
 #if defined(CONFIG_NOPMI_CHARGER)
 #else
-extern int get_prop_battery_charging_enabled(struct votable *usb_icl_votable,
-					union power_supply_propval *val);
-extern int set_prop_battery_charging_enabled(struct votable *usb_icl_votable,
-				const union power_supply_propval *val);
+//extern int get_prop_battery_charging_enabled(struct votable *usb_icl_votable,
+//					union power_supply_propval *val);
+//extern int set_prop_battery_charging_enabled(struct votable *usb_icl_votable,
+//				const union power_supply_propval *val);
 #endif
 #endif
 extern void max77729_usbc_icurr(u8 curr);
@@ -147,7 +145,7 @@ static enum power_supply_property max77729_batt_props[] = {
 #endif
 	POWER_SUPPLY_PROP_CHARGE_CONTROL_LIMIT,
 };
-#endif
+#endif //nopmi-end
 
 static struct device_attribute max77729_charger_attrs[] = {
 	MAX77729_CHARGER_ATTR(chip_id),
@@ -170,11 +168,19 @@ static void max77729_chg_set_mode_state(struct max77729_charger_data *charger,
 static void max77729_set_switching_frequency(struct max77729_charger_data *charger,
 					int frequency);
 
-static int max77729_set_fast_charge_mode(struct max77729_charger_data *charger, int pd_active)
+int max77729_set_fast_charge_mode(struct max77729_charger_data *charger, int pd_active)
 {
 	int rc = 0;
 	union power_supply_propval prop ={0, };
 	int batt_verify = 0, batt_soc = 0, batt_temp = 0;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+	struct platform_device *pdev = to_platform_device(charger->dev);
+	struct max77729_dev *max77729 = dev_get_drvdata(pdev->dev.parent);	
+
+	if (!max77729) {
+	pr_err("Failed to get max77729_dev from parent\n");
+	}
+#endif
 
 	if(!charger->psy_bms)
 		charger->psy_bms = power_supply_get_by_name("bms");
@@ -182,11 +188,11 @@ static int max77729_set_fast_charge_mode(struct max77729_charger_data *charger, 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 		rc = power_supply_get_property(charger->psy_bms, POWER_SUPPLY_PROP_CHIP_OK, &prop);
 #else
-		rc = max77729_charger_get_iio_channel(charger, DS28E16, DS_CHIP_OK, &prop.intval);
+		rc = max77729_get_iio_channel(max77729, MAXIM_DS, MAXIM_DS_CHIP_OK, &prop.intval);
 #endif
 		if (rc < 0) {
 			pr_err("%s : get battery chip ok fail\n",__func__);
-		}
+			}
 		batt_verify = prop.intval;
 
 		rc = power_supply_get_property(charger->psy_bms, POWER_SUPPLY_PROP_CAPACITY, &prop);
@@ -208,7 +214,7 @@ static int max77729_set_fast_charge_mode(struct max77729_charger_data *charger, 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 		g_ffc_disable = false;
 #else
-		max77729_charger_set_iio_channel(charger,  MAXIM_NOPMI, NOPMI_CHG_FFC_DISABLE, false);
+		max77729_set_iio_channel(max77729, MAXIM_NOPMI, MAXIM_NOPMI_CHG_FFC_DISABLE, false);
 #endif
 		if(batt_temp >= 150 && batt_temp <= 480){
 			prop.intval = 1;
@@ -221,22 +227,32 @@ static int max77729_set_fast_charge_mode(struct max77729_charger_data *charger, 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 		g_ffc_disable = true;
 #else
-                max77729_charger_set_iio_channel(charger,  MAXIM_NOPMI, NOPMI_CHG_FFC_DISABLE, true);
+        max77729_set_iio_channel(max77729, MAXIM_NOPMI, MAXIM_NOPMI_CHG_FFC_DISABLE, true);
 #endif
 	}
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 	rc = psy_do_property("bms", set, POWER_SUPPLY_PROP_FASTCHARGE_MODE, prop);
 #else
-	rc = max77729_charger_set_iio_channel(charger, MAX77729_CHG_BMS, FG_FASTCHARGE_MODE, prop.intval);
+	if(!charger->psy_bms)
+		charger->psy_bms = power_supply_get_by_name("bms");
+	if(charger->psy_bms){
+	rc = max77729_set_iio_channel(max77729, MAXIM_FG, MAXIM_FG_FASTCHARGE_MODE, prop.intval);
+		if (rc < 0)
+			pr_err("Failed to set MAXIM_FG_FASTCHARGE_MODE ret=%d\n", rc);
+    }else{
+        pr_err("Failed to set MAXIM_FG_FASTCHARGE_MODE iio for bms\n");
+    }	
 #endif
-	if (rc < 0) {
-		pr_err("%s : set fastcharge mode fail\n", __func__);
-	}
+        if (rc < 0) {
+                pr_err("%s : set fastcharge mode fail\n", __func__);
+        }     
+        
 	return rc;
 }
+EXPORT_SYMBOL(max77729_set_fast_charge_mode);
 
-static bool max77729_charger_unlock(struct max77729_charger_data *charger)
+bool max77729_charger_unlock(struct max77729_charger_data *charger)
 {
 	u8 reg_data, chgprot;
 	int retry_cnt = 0;
@@ -257,6 +273,7 @@ static bool max77729_charger_unlock(struct max77729_charger_data *charger)
 
 	return need_init;
 }
+EXPORT_SYMBOL(max77729_charger_unlock);
 
 static void check_charger_unlock_state(struct max77729_charger_data *charger)
 {
@@ -895,7 +912,7 @@ static void max77729_set_wireless_input_current(
 	/* queue_delayed_work(charger->wqueue, &charger->wc_current_work, 0); */
 }
 
-static void max77729_set_topoff_current(struct max77729_charger_data *charger,
+void max77729_set_topoff_current(struct max77729_charger_data *charger,
 					int termination_current)
 {
 	int curr_base = 150, curr_step = 50;
@@ -913,8 +930,9 @@ static void max77729_set_topoff_current(struct max77729_charger_data *charger,
 	/* pr_info("%s: reg_data(0x%02x), topoff(%dmA)\n", */
 		/* __func__, reg_data, termination_current); */
 }
+EXPORT_SYMBOL(max77729_set_topoff_current);
 
-static void max77729_set_topoff_time(struct max77729_charger_data *charger,
+void max77729_set_topoff_time(struct max77729_charger_data *charger,
 					int topoff_time)
 {
 	u8 reg_data = (topoff_time / 10) << CHG_CNFG_03_TO_TIME_SHIFT;
@@ -925,6 +943,7 @@ static void max77729_set_topoff_time(struct max77729_charger_data *charger,
 	/* pr_info("%s: reg_data(0x%02x), topoff_time(%dmin)\n", */
 		/* __func__, reg_data, topoff_time); */
 }
+EXPORT_SYMBOL(max77729_set_topoff_time);
 
 static void max77729_set_switching_frequency(struct max77729_charger_data *charger,
 				int frequency)
@@ -1617,7 +1636,6 @@ static int max77729_chg_get_property(struct power_supply *psy,
 		val->intval = (charger->charge_mode == SEC_BAT_CHG_MODE_CHARGING?1 : 0);
 		break;
 #endif
-
 	case POWER_SUPPLY_PROP_CONSTANT_CHARGE_VOLTAGE:
 		val->intval = max77729_is_constant_current(charger) ? 0 : 1;
 		break;
@@ -2226,6 +2244,12 @@ int max77729_usb_get_property(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_TYPE:
 		break;
+	case POWER_SUPPLY_PROP_CHARGE_TYPE:
+		if(charger->pd_active)
+			val->intval = POWER_SUPPLY_TYPE_USB_PD;
+		else
+			val->intval = charger->real_type;
+		break;
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 	case POWER_SUPPLY_PROP_REAL_TYPE:
 		if(charger->pd_active)
@@ -2358,6 +2382,13 @@ int max77729_usb_set_property(struct power_supply *psy,
 		/* } */
    	break;
 #endif
+	case POWER_SUPPLY_PROP_CHARGE_TYPE:
+		if (charger->real_type != val->intval){
+			charger->real_type = val->intval;
+			schedule_delayed_work(&charger->notify_work, msecs_to_jiffies(300));
+			 pr_info("max77729_usb_set_property REAL_TYPE:%d\n", charger->real_type);
+		}
+		break;
 	case POWER_SUPPLY_PROP_PRESENT:
 		charger->usb_online =  val->intval;
 		break;
@@ -2418,7 +2449,8 @@ int usb_prop_is_writeable(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_REAL_TYPE:
 	case POWER_SUPPLY_PROP_MTBF_CUR:
 #else
-        case POWER_SUPPLY_PROP_ONLINE:
+    case POWER_SUPPLY_PROP_ONLINE:
+    case POWER_SUPPLY_PROP_CHARGE_TYPE:
 #endif
 		return 1;
 	default:
@@ -2426,7 +2458,7 @@ int usb_prop_is_writeable(struct power_supply *psy,
 	}
 	return 0;
 }
-
+EXPORT_SYMBOL(usb_prop_is_writeable);
 
 int max77729_batt_get_property(struct power_supply *psy,
 		enum power_supply_property psp,
@@ -2971,7 +3003,16 @@ static void max77729_chgin_isr_work(struct work_struct *work)
 	struct max77729_charger_data *charger =
 		container_of(work, struct max77729_charger_data, chgin_work.work);
 	union power_supply_propval value= {0, };
-	u8 chgin_dtls, chg_dtls, chg_cnfg_00, intok;
+        u8 chgin_dtls, chg_dtls, chg_cnfg_00, intok;
+	int rc;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+	struct platform_device *pdev = to_platform_device(charger->dev);
+	struct max77729_dev *max77729 = dev_get_drvdata(pdev->dev.parent);
+
+	if (!max77729) {
+	pr_err("Failed to get max77729_dev from parent\n");
+	}
+#endif
 
 	max77729_read_reg(charger->i2c, MAX77729_CHG_REG_DETAILS_00, &chgin_dtls);
 	chgin_dtls =
@@ -3026,7 +3067,15 @@ static void max77729_chgin_isr_work(struct work_struct *work)
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
  			psy_do_property("usb", set, POWER_SUPPLY_PROP_REAL_TYPE, value);
 #else
- 			max77729_charger_set_iio_channel(charger, MAXIM_NOPMI, NOPMI_CHG_USB_REAL_TYPE, value.intval);
+	if (!charger->psy_usb)
+		charger->psy_usb = power_supply_get_by_name("usb");
+	if (charger->psy_usb) {
+ 		rc = max77729_set_iio_channel(max77729, MAXIM_CHG, MAXIM_CHG_USB_REAL_TYPE, value.intval);
+		if (rc < 0)
+			pr_err("Failed to set USB_REAL_TYPE IIO rc=%d\n", rc);
+    }else{
+        pr_err("Failed to set MAXIM_CHG_USB_REAL_TYPE iio for usb\n");
+    }
 #endif
 	if (!charger->psy_usb) {
 		charger->psy_usb = power_supply_get_by_name("usb");
@@ -3124,6 +3173,15 @@ static void max77729_notify_work(struct work_struct *work)
 		container_of(work, struct max77729_charger_data, notify_work.work);
 	union power_supply_propval pval ={0,};
 	int input_curr_limit = 0, fastchg_curr = 6000, mtbf_cur = 0, i;
+	int rc;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+	struct platform_device *pdev = to_platform_device(charger->dev);
+	struct max77729_dev *max77729 = dev_get_drvdata(pdev->dev.parent);
+
+	if (!max77729) {
+	pr_err("Failed to get max77729_dev from parent\n");
+	}
+#endif
 
  	if (!charger->psy_usb) {
 		charger->psy_usb = power_supply_get_by_name("usb");
@@ -3173,7 +3231,6 @@ static void max77729_notify_work(struct work_struct *work)
  * So disable HVDCP and float from switch and define it on
  * if condition instead of switch.
  */
-// Code debug by @muralivijay
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 			case POWER_SUPPLY_TYPE_USB_HVDCP:
 				input_curr_limit = 2000;
@@ -3295,7 +3352,15 @@ static void max77729_notify_work(struct work_struct *work)
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 		power_supply_get_property(charger->psy_usb, POWER_SUPPLY_PROP_MTBF_CUR, &pval);
 #else
-		max77729_charger_get_iio_channel(charger, MAXIM_NOPMI, NOPMI_CHG_MTBF_CUR, &pval.intval);
+        if (!charger->psy_usb)
+               charger->psy_usb = power_supply_get_by_name("usb");
+        if (charger->psy_usb) {
+		rc = max77729_get_iio_channel(max77729, MAXIM_NOPMI, MAXIM_NOPMI_CHG_MTBF_CUR, &pval.intval);
+		if (rc < 0)
+			pr_err("Failed to get mtbf_cur ret=%d\n", rc);
+        }else{
+            pr_err("Failed to get mtbf_cur iio for usb\n");
+        }
 #endif
 		mtbf_cur = pval.intval;
 		if (input_curr_limit <= 1000 && mtbf_cur >= 1500){
@@ -3318,7 +3383,6 @@ static void max77729_notify_work(struct work_struct *work)
 	}
 }
 
-
 static void max77729_adapter_changed_work(struct work_struct *work)
 {
 	struct max77729_charger_data *charger =
@@ -3327,8 +3391,17 @@ static void max77729_adapter_changed_work(struct work_struct *work)
 	union power_supply_propval pvalue ={0,};
 	enum power_supply_type real_charger_type;
 	static int pre_pd_active = 0;
-	bool post_usb_state = false;
-	u8 chgin_dtls, dcdtmo, ccstat;
+        bool post_usb_state = false;
+        u8 chgin_dtls, dcdtmo, ccstat;
+	int rc;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+	struct platform_device *pdev = to_platform_device(charger->dev);
+	struct max77729_dev *max77729 = dev_get_drvdata(pdev->dev.parent);
+
+        if (!max77729) {
+        pr_err("Failed to get max77729_dev from parent\n");
+        }
+#endif
 
  	max77729_read_reg(charger->i2c, MAX77729_CHG_REG_DETAILS_00, &chgin_dtls);
 	chgin_dtls =
@@ -3491,7 +3564,15 @@ static void max77729_adapter_changed_work(struct work_struct *work)
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 			psy_do_property("usb", set, POWER_SUPPLY_PROP_REAL_TYPE, value);
 #else
-			max77729_charger_set_iio_channel(charger, MAXIM_NOPMI, NOPMI_CHG_USB_REAL_TYPE, value.intval);
+        if (!charger->psy_usb)
+                charger->psy_usb = power_supply_get_by_name("usb");
+        if (charger->psy_usb) {
+			rc = max77729_set_iio_channel(max77729, MAXIM_CHG, MAXIM_CHG_USB_REAL_TYPE, value.intval);
+    		if (rc < 0)
+    			pr_err("Failed to set USB_REAL_TYPE IIO rc=%d\n", rc);
+    }else{
+        pr_err("Failed to set MAXIM_CHG_USB_REAL_TYPE iio for usb\n");
+    }
 #endif
 		if (charger->pd_active != g_usbc_data->pd_active) {
 			charger->pd_active = g_usbc_data->pd_active;
@@ -3543,6 +3624,14 @@ static void max77729_period_work(struct work_struct *work)
 	union power_supply_propval pval ={0, };
 	u8 reg_data;
 	int rc = 0;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+	struct platform_device *pdev = to_platform_device(charger->dev);
+	struct max77729_dev *max77729 = dev_get_drvdata(pdev->dev.parent);	
+
+	if (!max77729) {
+	pr_err("Failed to get max77729_dev from parent\n");
+	}
+#endif
 
 	if (charger->in_suspend){
 		pr_err("%s : charger is in suspend, i2c is not ready\n", __func__);
@@ -3581,16 +3670,25 @@ static void max77729_period_work(struct work_struct *work)
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 		rc = power_supply_get_property(charger->psy_bms, POWER_SUPPLY_PROP_FASTCHARGE_MODE, &pval);
 #else
-		rc = max77729_charger_get_iio_channel(charger, MAX77729_CHG_BMS, FG_FASTCHARGE_MODE, &pval.intval);
-#endif		
-		if (rc < 0) {
-			pr_err("%s : get POWER_SUPPLY_PROP_FASTCHARGE_MODE fail\n", __func__);
-		}
-		fast_mode = pval.intval;
+        if (!charger->psy_bms)
+               charger->psy_bms = power_supply_get_by_name("bms");
+        if (charger->psy_bms) {
+		rc = max77729_get_iio_channel(max77729, MAXIM_FG, MAXIM_FG_FASTCHARGE_MODE, &pval.intval);
+    }else {
+       pr_err("Failed to get MAXIM_FG_FASTCHARGE_MODE iio for bms\n");
+    }
+#endif
+                if (rc < 0) {
+                        pr_err("%s : get POWER_SUPPLY_PROP_FASTCHARGE_MODE fail\n", __func__);
+                }
 
+                fast_mode = pval.intval;
+	        if (fast_mode < 0)
+	                pr_err("get fastcharge mode fail ret=%d\n", fast_mode);                
+                
 		rc = power_supply_get_property(charger->psy_bms, POWER_SUPPLY_PROP_TEMP, &pval);
 		if (rc < 0) {
-			pr_err("%s : get POWER_SUPPLY_PROP_FASTCHARGE_MODE fail\n", __func__);
+			pr_err("%s : get POWER_SUPPLY_PROP_TEMP fail\n", __func__);
 		}
 		batt_temp = pval.intval;
 
@@ -3606,9 +3704,19 @@ static void max77729_period_work(struct work_struct *work)
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 		rc = power_supply_get_property(charger->psy_bms, POWER_SUPPLY_PROP_RESISTANCE_ID, &pval);
 #else
-		rc = max77729_charger_get_iio_channel(charger, MAX77729_CHG_BMS, FG_RESISTANCE_ID, &pval.intval);
-#endif		
-		batt_id = pval.intval;
+        if (!charger->psy_bms)
+               charger->psy_bms = power_supply_get_by_name("bms");
+        if (charger->psy_bms) {
+		rc = max77729_get_iio_channel(max77729, MAXIM_FG, MAXIM_FG_RESISTANCE_ID, &pval.intval);
+		if (rc < 0)
+			pr_err("Failed to get MAXIM_FG_RESISTANCE_ID ret=%d\n", rc);
+        }else{
+            pr_err("Failed to get MAXIM_FG_RESISTANCE_ID iio for bms\n");
+        }        
+#endif
+                batt_id = pval.intval;
+                if (batt_id < 0)
+                        pr_err("get battery_id fail ret=%d\n", batt_id);
 
  		max77729_read_reg(charger->i2c,
 				  MAX77729_CHG_REG_DETAILS_01, &reg_data);
@@ -3616,9 +3724,17 @@ static void max77729_period_work(struct work_struct *work)
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 		psy_do_property("battery", get, POWER_SUPPLY_PROP_BATTERY_CHARGING_ENABLED, pval);
 #else
-		rc = max77729_charger_get_iio_channel(charger, MAX77729_CHG_MAIN, MAIN_BATTERY_CHARGING_ENABLED, &pval.intval);
-#endif		
-		if (batt_id == BATTERY_VENDOR_UNKNOWN){
+        if (!charger->psy_batt)
+                charger->psy_batt = power_supply_get_by_name("battery");
+        if (charger->psy_batt) {
+		rc = max77729_get_iio_channel(max77729, MAXIM_CHG, MAXIM_CHG_BATTERY_CHARGING_ENABLED, &pval.intval);
+                if (rc < 0)
+                       pr_err("Failed to get BATTERY_CHARGING_ENABLED IIO rc=%d\n", rc);
+        }else{
+            pr_err("Failed to get BATTERY_CHARGING_ENABLED iio for battery\n");
+        } 
+#endif
+		if (batt_id == MAXIM_BATTERY_VENDOR_UNKNOWN){
 			schedule_delayed_work(&charger->period_work, msecs_to_jiffies(10000));
 			schedule_delayed_work(&charger->batt_notify_work, msecs_to_jiffies(11000));
 			return;
@@ -4048,469 +4164,17 @@ static int usb_icl_vote_callback(struct votable *votable, void *data,
 	return 0;
 }
 
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(5, 4, 0))
-/* DS28E16 Channel validate */
-static bool is_ds_chan_valid(struct max77729_charger_data *chip,
-		enum ds_ext_iio_channels chan)
-{
-	int rc;
-
-	if (IS_ERR(chip->ds_ext_iio_chans[chan]))
-		return false;
-
-	if (!chip->ds_ext_iio_chans[chan]) {
-		chip->ds_ext_iio_chans[chan] = iio_channel_get(chip->dev,
-					ds_ext_iio_chan_name[chan]);
-		if (IS_ERR(chip->ds_ext_iio_chans[chan])) {
-			rc = PTR_ERR(chip->ds_ext_iio_chans[chan]);
-			if (rc == -EPROBE_DEFER)
-				chip->ds_ext_iio_chans[chan] = NULL;
-
-			pr_err("Failed to get IIO channel %s, rc=%d\n",
-				ds_ext_iio_chan_name[chan], rc);
-			return false;
-		}
-	}
-
-	return true;
-}
-
-/* BMS Channel validate */
-static bool is_bms_chan_valid(struct max77729_charger_data *chip,
-		enum fg_ext_iio_channels chan)
-{
-	int rc;
-
-	if (IS_ERR(chip->fg_ext_iio_chans[chan]))
-		return false;
-
-	if (!chip->fg_ext_iio_chans[chan]) {
-		chip->fg_ext_iio_chans[chan] = iio_channel_get(chip->dev,
-					fg_ext_iio_chan_name[chan]);
-		if (IS_ERR(chip->fg_ext_iio_chans[chan])) {
-			rc = PTR_ERR(chip->fg_ext_iio_chans[chan]);
-			if (rc == -EPROBE_DEFER)
-				chip->fg_ext_iio_chans[chan] = NULL;
-
-			pr_err("Failed to get IIO channel %s, rc=%d\n",
-				fg_ext_iio_chan_name[chan], rc);
-			return false;
-		}
-	}
-
-	return true;
-}
-
-/* NOPMI Channel validate */
-static bool is_nopmi_chg_chan_valid(struct max77729_charger_data *chip,
-		enum nopmi_chg_ext_iio_channels chan)
-{
-	int rc;
-
-	if (IS_ERR(chip->nopmi_chg_ext_iio_chans[chan]))
-		return false;
-
-	if (!chip->nopmi_chg_ext_iio_chans[chan]) {
-		chip->nopmi_chg_ext_iio_chans[chan] = iio_channel_get(chip->dev,
-					nopmi_chg_ext_iio_chan_name[chan]);
-		if (IS_ERR(chip->nopmi_chg_ext_iio_chans[chan])) {
-			rc = PTR_ERR(chip->nopmi_chg_ext_iio_chans[chan]);
-			if (rc == -EPROBE_DEFER)
-				chip->nopmi_chg_ext_iio_chans[chan] = NULL;
-
-			pr_err("Failed to get IIO channel %s, rc=%d\n",
-				nopmi_chg_ext_iio_chan_name[chan], rc);
-			return false;
-		}
-	}
-
-	return true;
-}
-
-/* MAIN Channel validate */
-static bool is_main_chan_valid(struct max77729_charger_data *chip,
-		enum main_iio_channels chan)
-{
-	int rc;
-	if (IS_ERR(chip->main_iio[chan]))
-		return false;
-	if (!chip->main_iio[chan]) {
-		chip->main_iio[chan] = iio_channel_get(chip->dev,
-					main_iio_chan_name[chan]);
-		if (IS_ERR(chip->main_iio[chan])) {
-			rc = PTR_ERR(chip->main_iio[chan]);
-			if (rc == -EPROBE_DEFER)
-				chip->main_iio[chan] = NULL;
-			pr_err("Failed to get IIO channel %s, rc=%d\n",
-				main_iio_chan_name[chan], rc);
-			return false;
-		}
-	}
-	return true;
-}
-
-int max77729_charger_get_iio_channel(struct max77729_charger_data *chg,
-			enum max77729_charger_iio_type type, int channel, int *val)
-{
-	struct iio_channel *iio_chan_list = NULL;
-	int rc = 0;
-
-	switch (type) {
-	case DS28E16:
-		if (!!is_ds_chan_valid(chg, channel))
-			return -ENODEV;
-		iio_chan_list = chg->fg_ext_iio_chans[channel];
-		break;
-	case MAX77729_CHG_BMS:
-		if (!is_bms_chan_valid(chg, channel))
-			return -ENODEV;
-		iio_chan_list = chg->fg_ext_iio_chans[channel];
-		break;
-	case MAXIM_NOPMI:
-		if (!is_nopmi_chg_chan_valid(chg, channel))
-			return -ENODEV;
-		iio_chan_list = chg->nopmi_chg_ext_iio_chans[channel];
-		break;
-	case MAX77729_CHG_MAIN:
-		if (!is_main_chan_valid(chg, channel))
-			return -ENODEV;
-		iio_chan_list = chg->main_iio[channel];
-		break;
-
-	default:
-		pr_err_ratelimited("iio_type %d is not supported\n", type);
-		return -EINVAL;
-	}
-
-	rc = iio_read_channel_processed(iio_chan_list, val);
-
-	return rc < 0 ? rc : 0;
-}
-
-int max77729_charger_set_iio_channel(struct max77729_charger_data *chg,
-			enum max77729_charger_iio_type type, int channel, int val)
-{
-	struct iio_channel *iio_chan_list = NULL;
-	int rc = 0;
-
-	switch (type) {
-	case DS28E16:
-		break;
-	case MAX77729_CHG_BMS:
-		if (!is_bms_chan_valid(chg, channel))
-			return -ENODEV;
-		iio_chan_list = chg->fg_ext_iio_chans[channel];
-		break;
-	case MAXIM_NOPMI:
-		if (!is_nopmi_chg_chan_valid(chg, channel))
-			return -ENODEV;
-		iio_chan_list = chg->nopmi_chg_ext_iio_chans[channel];
-		break;
-	case MAX77729_CHG_MAIN:
-		if (!is_main_chan_valid(chg, channel))
-			return -ENODEV;
-		iio_chan_list = chg->main_iio[channel];
-		break;
-
-	default:
-		pr_err_ratelimited("iio_type %d is not supported\n", type);
-		return -EINVAL;
-	}
-
-	rc = iio_write_channel_raw(iio_chan_list, val);
-
-	return rc < 0 ? rc : 0;
-}
-
-
-int max77729_charger_iio_read_raw(struct iio_dev *indio_dev,
-		struct iio_chan_spec const *chan, int *val1,
-		int *val2, long mask)
-{
-	struct max77729_charger_data *charger = iio_priv(indio_dev);
-	int rc = 0;
-
-	*val1 = 0;
-
-	switch (chan->channel) {
-	case PSY_IIO_SHUTDOWN_DELAY:
-		*val1 = charger->shutdown_delay;
-		break;
-	case PSY_IIO_BATTERY_CHARGING_ENABLED:
-		*val1 =!(get_client_vote_locked(charger->usb_icl_votable, MAIN_CHG_ENABLE_VOTER) == MAIN_ICL_MIN);
-		break;
-	case PSY_IIO_INPUT_SUSPEND:
-		*val1 = (get_client_vote_locked(charger->usb_icl_votable, MAIN_CHG_SUSPEND_VOTER) == 0);
-		break;
-	case PSY_IIO_USB_REAL_TYPE:
-		if(charger->pd_active)
-			*val1 = POWER_SUPPLY_TYPE_USB_PD;
-		else
-			*val1 = charger->real_type;
-		/* pr_debug("get REAL_TYPE %d\n", val->intval); */
-		break;
-	case PSY_IIO_PD_ACTIVE:
-		*val1 = charger->pd_active;
-		/* pr_debug("get PD_ACTIVE %d\n", charger->pd_active); */
-		break;
-	case PSY_IIO_TYPEC_CC_ORIENTATION:
-		if (g_usbc_data)
-			*val1 = g_usbc_data->cc_pin_status;
-		else
-			*val1 = 0;
-		break;
-	case PSY_IIO_TYPEC_MODE:
-		*val1 = QTI_POWER_SUPPLY_TYPEC_NONE;
-
-		if (g_usbc_data) {
-			switch(g_usbc_data->cc_data->ccistat) {
-				case NOT_IN_UFP_MODE:
-					*val1 = QTI_POWER_SUPPLY_TYPEC_SINK;
-					break;
-				case CCI_1_5A:
-					*val1 = QTI_POWER_SUPPLY_TYPEC_SOURCE_MEDIUM;
-					break;
-				case CCI_3_0A:
-					*val1 = QTI_POWER_SUPPLY_TYPEC_SOURCE_HIGH;
-					break;
-				case CCI_500mA:
-					*val1 = QTI_POWER_SUPPLY_TYPEC_SOURCE_DEFAULT;
-				default:
-					break;
-			}
-			if (g_usbc_data->plug_attach_done){
-				if (g_usbc_data->acc_type == 1){
-
-					*val1 = QTI_POWER_SUPPLY_TYPEC_SINK_AUDIO_ADAPTER;
-				}
-			} else {
-
-				*val1 = QTI_POWER_SUPPLY_TYPEC_NONE;
-			}
-		}
-		break;
-	case PSY_IIO_CHARGING_ENABLED:
-		*val1 = (charger->charge_mode == SEC_BAT_CHG_MODE_CHARGING?1 : 0);
-		break;
-	default:
-		pr_info("Unsupported max77729_charger IIO chan %d\n", chan->channel);
-		rc = -EINVAL;
-		break;
-	}
-
-	if (rc < 0) {
-		pr_err("Couldn't read IIO channel %d, rc = %d\n",
-			chan->channel, rc);
-		return rc;
-	}
-
-	return IIO_VAL_INT;
-}
-EXPORT_SYMBOL(max77729_charger_iio_read_raw);
-
-int max77729_charger_iio_write_raw(struct iio_dev *indio_dev,
-		struct iio_chan_spec const *chan, int val1,
-		int val2, long mask)
-{
-	struct max77729_charger_data *charger = iio_priv(indio_dev);
-	int rc = 0;
-	static int last_shutdown_delay;
-
-	switch (chan->channel) {
-	case PSY_IIO_SHUTDOWN_DELAY:
-		if (last_shutdown_delay != val1) {
-			charger->shutdown_delay = val1;
-			if (!charger->psy_batt)
-				charger->psy_batt = power_supply_get_by_name("battery");
-			if (charger->psy_batt)
-				power_supply_changed(charger->psy_batt);
-		}
-		last_shutdown_delay = charger->shutdown_delay;
-		break;
-	case PSY_IIO_BATTERY_CHARGING_ENABLED:
-		max77729_charger_unlock(charger);
-		vote(charger->usb_icl_votable, MAIN_CHG_ENABLE_VOTER, !val1, MAIN_ICL_MIN);
-		vote(charger->mainfcc_votable, MAIN_CHG_ENABLE_VOTER, !val1, 200);
-		if (val1){
-			max77729_set_topoff_current(charger, 500);
-			max77729_set_topoff_time(charger, 1);
-		} else {
-			max77729_set_topoff_time(charger, 30);
-			max77729_set_topoff_current(charger, 150);
-		}
-		break;
-	case PSY_IIO_INPUT_SUSPEND:
-		pr_err("%s: Set input suspend prop, value:%d\n",__func__,val1);
-		vote(charger->usb_icl_votable, MAIN_CHG_SUSPEND_VOTER, !!val1, 0);
-		if (val1) {
-			vote(charger->chgctrl_votable, MAIN_CHG_SUSPEND_VOTER, true, SEC_BAT_CHG_MODE_BUCK_OFF);
-		} else {
-			vote(charger->chgctrl_votable, MAIN_CHG_SUSPEND_VOTER, false, SEC_BAT_CHG_MODE_BUCK_OFF);
-			vote(charger->usb_icl_votable, MAIN_CHG_AICL_VOTER, false, 0);
-		}
-		break;
-	case PSY_IIO_USB_REAL_TYPE:
-		if (charger->real_type != val1){
-			charger->real_type = val1;
-			schedule_delayed_work(&charger->notify_work, msecs_to_jiffies(300));
-			/* pr_debug("max77729_usb_set_property REAL_TYPE:%d\n", charger->real_type); */
-		}
-		break;
-	case PSY_IIO_PD_ACTIVE:
-		/* if (charger->pd_active != val->intval) { */
-			charger->pd_active = val1;
-			schedule_delayed_work(&charger->notify_work, msecs_to_jiffies(300));
-			pr_debug("max77729_usb_set_property PD_ACTIVE:%d\n", charger->pd_active);
-			if (charger->pd_active == 2){
-				val1 = 1;
-			} else {
-				val1 = 0;
-			}
-			max77729_set_fast_charge_mode(charger, charger->pd_active);
-		/* } */
-		break;
-	case PSY_IIO_CHARGING_ENABLED:
-		charger->charge_mode =(val1 ? SEC_BAT_CHG_MODE_CHARGING: SEC_BAT_CHG_MODE_CHARGING_OFF);
-		charger->misalign_cnt = 0;
-		/* max77729_chg_set_mode_state(charger, charger->charge_mode); */
-		vote(charger->chgctrl_votable, "charger-enable", true, charger->charge_mode);
-	default:
-		pr_err("Unsupported max77729_charger IIO chan %d\n", chan->channel);
-		rc = -EINVAL;
-		break;
-	}
-	if (rc < 0)
-		pr_err("Couldn't write IIO channel %d, rc = %d\n",
-			chan->channel, rc);
-	return rc;
-}
-EXPORT_SYMBOL(max77729_charger_iio_write_raw);
-
-static int max77729_charger_iio_of_xlate(struct iio_dev *indio_dev,
-				const struct of_phandle_args *iiospec)
-{
-	struct max77729_charger_data *charger = iio_priv(indio_dev);
-	struct iio_chan_spec *iio_chan = charger->iio_chan;
-	int i;
-
-	for (i = 0; i < ARRAY_SIZE(max77729_charger_iio_psy_channels);
-					i++, iio_chan++)
-		if (iio_chan->channel == iiospec->args[0])
-			return i;
-
-	return -EINVAL;
-}
-
-static const struct iio_info max77729_charger_iio_info = {
-// Enable it when don,t use nopmi_chg
-#if 0
-	.read_raw	= max77729_charger_iio_read_raw,
-	.write_raw	= max77729_charger_iio_write_raw,
-#endif
-	.of_xlate	= max77729_charger_iio_of_xlate,
-};
-
-static int max77729_charger_init_iio_psy(struct max77729_charger_data *chip)
-{
-	struct iio_dev *indio_dev = chip->indio_dev;
-	struct iio_chan_spec *chan = NULL;
-	int num_iio_channels = ARRAY_SIZE(max77729_charger_iio_psy_channels);
-	int rc = 0, i = 0;
-
-	pr_info("max77729_charger_init_iio_psy start\n");
-	chip->iio_chan = devm_kcalloc(chip->dev, num_iio_channels,
-				sizeof(*chip->iio_chan), GFP_KERNEL);
-	if (!chip->iio_chan)
-		return -ENOMEM;
-
-	chip->int_iio_chans = devm_kcalloc(chip->dev,
-				num_iio_channels,
-				sizeof(*chip->int_iio_chans),
-				GFP_KERNEL);
-
-	if (!chip->int_iio_chans)
-		return -ENOMEM;
-
-	indio_dev->info = &max77729_charger_iio_info;
-	indio_dev->dev.parent = chip->dev;
-	indio_dev->dev.of_node = chip->dev->of_node;
-	indio_dev->modes = INDIO_DIRECT_MODE;
-	indio_dev->channels = chip->iio_chan;
-	indio_dev->num_channels = num_iio_channels;
-	indio_dev->name = "max77729_charger";
-
-	for (i = 0; i < num_iio_channels; i++) {
-		chip->int_iio_chans[i].indio_dev = indio_dev;
-		chan = &chip->iio_chan[i];
-		chip->int_iio_chans[i].channel = chan;
-		chan->address = i;
-		chan->channel = max77729_charger_iio_psy_channels[i].channel_num;
-		chan->type = max77729_charger_iio_psy_channels[i].type;
-		chan->datasheet_name =
-			max77729_charger_iio_psy_channels[i].datasheet_name;
-		chan->extend_name =
-			max77729_charger_iio_psy_channels[i].datasheet_name;
-		chan->info_mask_separate =
-			max77729_charger_iio_psy_channels[i].info_mask;
-	}
-
-	rc = devm_iio_device_register(chip->dev, indio_dev);
-
-	if (rc)
-		pr_err("Failed to register max77729_charger IIO device, rc=%d\n", rc);
-
-	pr_info("battery IIO device, rc=%d\n", rc);
-
-	return rc;
-}
-
-static int max77729_charger_ext_init_iio_psy(struct max77729_charger_data *chip)
-{
-	if (!chip)
-		return -ENOMEM;
-
-	chip->fg_ext_iio_chans = devm_kcalloc(chip->dev,
-				ARRAY_SIZE(fg_ext_iio_chan_name), sizeof(*chip->fg_ext_iio_chans), GFP_KERNEL);
-	if (!chip->fg_ext_iio_chans)
-		return -ENOMEM;
-
-	chip->nopmi_chg_ext_iio_chans = devm_kcalloc(chip->dev,
-		        ARRAY_SIZE(nopmi_chg_ext_iio_chan_name), sizeof(*chip->nopmi_chg_ext_iio_chans), GFP_KERNEL);
-	if (!chip->nopmi_chg_ext_iio_chans)
-		return -ENOMEM;
-
-	chip->main_iio = devm_kcalloc(chip->dev,
-		        ARRAY_SIZE(main_iio_chan_name), sizeof(*chip->main_iio), GFP_KERNEL);
-	if (!chip->main_iio)
-		return -ENOMEM;
-
-	chip->ds_ext_iio_chans = devm_kcalloc(chip->dev,
-		        ARRAY_SIZE(ds_ext_iio_chan_name), sizeof(*chip->ds_ext_iio_chans), GFP_KERNEL);
-	if (!chip->ds_ext_iio_chans)
-		return -ENOMEM;
-
-	return 0;
-}
-#endif
-
 static int max77729_charger_probe(struct platform_device *pdev)
 {
 	struct max77729_dev *max77729 = dev_get_drvdata(pdev->dev.parent);
 	struct max77729_platform_data *pdata = dev_get_platdata(max77729->dev);
 	max77729_charger_platform_data_t *charger_data;
-	struct max77729_charger_data *charger;
 	struct power_supply_config charger_cfg = { };
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(5, 4, 0))
-	struct iio_dev *indio_dev = NULL;
-        struct iio_dev *indio_dev1 = NULL;
-	static probe_cnt = 0;
-#endif
 	int ret = 0;
 	u8 reg_data;
 
         pr_info("%s: max77729 Charger Driver Loading\n", __func__);
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 	charger = kzalloc(sizeof(*charger), GFP_KERNEL);
 	if (!charger)
 		return -ENOMEM;
@@ -4520,39 +4184,10 @@ static int max77729_charger_probe(struct platform_device *pdev)
 		ret = -ENOMEM;
 		goto err_free;
 	}
-#else
-	if (probe_cnt == 0) {
-		pr_err("%s enter !\n",__func__);
-	}
 
-	probe_cnt ++;
-
-	indio_dev = devm_iio_device_alloc(&pdev->dev, sizeof(*charger));
-
-	if (!indio_dev){
-		pr_err("Failed to allocate memory\n");
-		return -ENOMEM;
-	}
-
-        indio_dev1 = devm_iio_device_alloc(&pdev->dev, sizeof(max77729_charger_platform_data_t));
-
-        if (!indio_dev1){
-                pr_err("Failed to allocate memory\n");
-                return -ENOMEM;
-                goto err_free;
-        }
-#endif
-
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 	mutex_init(&charger->charger_mutex);
 	mutex_init(&charger->mode_mutex);
 
-#else
-	charger = iio_priv(indio_dev);
-	charger->indio_dev = indio_dev;
-        charger_data = iio_priv(indio_dev1);
-        charger_data->indio_dev1 = indio_dev1;
-#endif
 	charger->dev = &pdev->dev;
 	charger->i2c = max77729->charger;
 	charger->pmic_i2c = max77729->i2c;
@@ -4567,11 +4202,6 @@ static int max77729_charger_probe(struct platform_device *pdev)
 	charger->wc_pre_current = WC_CURRENT_START;
 	charger->cable_type = SEC_BATTERY_CABLE_NONE;
 	charger->in_suspend = false;
-
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(5, 4, 0))
-        mutex_init(&charger->charger_mutex);
-        mutex_init(&charger->mode_mutex);
-#endif
 
 	if (max77729_read_reg(max77729->i2c, MAX77729_PMIC_REG_PMICREV, &reg_data) < 0) {
 		pr_err("device not found on this channel (this is not an error)\n");
@@ -4590,19 +4220,6 @@ static int max77729_charger_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, charger);
 
 	max77729_charger_initialize(charger);
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
-	ret = max77729_charger_ext_init_iio_psy(charger);
-	if (ret < 0) {
-		pr_err("Failed to initialize max77729_charger ext IIO PSY, ret=%d\n", ret);
-        goto err_free;
-	}
-
-	ret = max77729_charger_init_iio_psy(charger);
-	if (ret < 0) {
-		pr_err("Failed to initialize max77729_charger IIO PSY, ret=%d\n", ret);
-		goto err_free;
-	}
-#endif
 
 	max77729_read_reg(charger->i2c, MAX77729_CHG_REG_INT_OK, &reg_data);
 	/* if (reg_data & MAX77729_WCIN_OK) */

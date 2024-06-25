@@ -17,6 +17,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
+#define pr_fmt(fmt)     "[MAX77729-mfd] %s: " fmt, __func__
 
 #include <linux/version.h>
 #include <linux/kernel.h>
@@ -51,6 +52,9 @@
 #define I2C_ADDR_DEBUG  (0xC4 >> 1)
 
 #define I2C_RETRY_CNT	3
+
+struct max77729_dev *max77729;
+EXPORT_SYMBOL(max77729);
 
 /*
  * pmic revision information
@@ -490,7 +494,6 @@ static int __max77729_usbc_fw_update(
 	return ret;
 }
 
-
 static int max77729_fuelgauge_read_vcell(struct max77729_dev *max77729)
 {
 	u8 data[2];
@@ -783,11 +786,315 @@ void max77729_usbc_fw_setting(struct max77729_dev *max77729, int enforce_do)
 }
 EXPORT_SYMBOL_GPL(max77729_usbc_fw_setting);
 
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(5, 4, 0))
+int max77729_get_iio_channel(struct max77729_dev *max77729,
+			enum max77729_iio_type type, int channel, int *val)
+{
+	struct iio_channel *iio_chan_list = NULL;
+	int rc = 0;
+
+	switch (type) {
+	case MAXIM_DS:
+		if (!is_maxim_ds_chan_valid(max77729, channel))
+			return -ENODEV;
+		iio_chan_list = max77729->maxim_ds_ext_iio_chans[channel];
+		break;
+        case MAXIM_CHG:
+                if (!is_maxim_chg_chan_valid(max77729, channel))
+                        return -ENODEV;
+                iio_chan_list = max77729->maxim_chg_ext_iio_chans[channel];
+                break;
+        case MAXIM_FG:
+                if (!is_maxim_fg_chan_valid(max77729, channel))
+                        return -ENODEV;
+                iio_chan_list = max77729->maxim_fg_ext_iio_chans[channel];
+                break;
+	case MAXIM_NOPMI:
+		if (!is_maxim_nopmi_chan_valid(max77729, channel))
+			return -ENODEV;
+		iio_chan_list = max77729->maxim_nopmi_chg_ext_iio_chans[channel];
+		break;
+	default:
+		pr_err_ratelimited("iio_type %d is not supported\n", type);
+		return -EINVAL;
+	}
+
+	rc = iio_read_channel_processed(iio_chan_list, val);
+
+	return rc < 0 ? rc : 0;
+}
+EXPORT_SYMBOL(max77729_get_iio_channel);
+
+int max77729_set_iio_channel(struct max77729_dev *max77729,
+			enum max77729_iio_type type, int channel, int val)
+{
+	struct iio_channel *iio_chan_list = NULL;
+	int rc = 0;
+
+	switch (type) {
+        case MAXIM_CHG:
+                if (!is_maxim_chg_chan_valid(max77729, channel))
+                        return -ENODEV;
+                iio_chan_list = max77729->maxim_chg_ext_iio_chans[channel];
+                break;
+	case MAXIM_FG:
+                if (!is_maxim_fg_chan_valid(max77729, channel))
+                        return -ENODEV;
+                iio_chan_list = max77729->maxim_fg_ext_iio_chans[channel];
+                break;
+	case MAXIM_NOPMI:
+		if (!is_maxim_nopmi_chan_valid(max77729, channel))
+			return -ENODEV;
+		iio_chan_list = max77729->maxim_nopmi_chg_ext_iio_chans[channel];
+		break;
+	default:
+		pr_err_ratelimited("iio_type %d is not supported\n", type);
+		return -EINVAL;
+	}
+
+	rc = iio_write_channel_raw(iio_chan_list, val);
+
+	return rc < 0 ? rc : 0;
+}
+EXPORT_SYMBOL(max77729_set_iio_channel);
+
+//ds28e16
+bool is_maxim_ds_chan_valid(struct max77729_dev *max77729,
+		enum maxim_ds_ext_iio_channels chan)
+{
+	int rc;
+
+	if (IS_ERR(max77729->maxim_ds_ext_iio_chans[chan]))
+		return false;
+
+	if (!max77729->maxim_ds_ext_iio_chans[chan]) {
+		max77729->maxim_ds_ext_iio_chans[chan] = iio_channel_get(max77729->dev,
+					maxim_ds_ext_iio_chan_name[chan]);
+		if (IS_ERR(max77729->maxim_ds_ext_iio_chans[chan])) {
+			rc = PTR_ERR(max77729->maxim_ds_ext_iio_chans[chan]);
+			if (rc == -EPROBE_DEFER)
+				max77729->maxim_ds_ext_iio_chans[chan] = NULL;
+
+			pr_err("Failed to get IIO channel %s, rc=%d\n",
+				maxim_ds_ext_iio_chan_name[chan], rc);
+			return false;
+		}
+	}
+
+	return true;
+}
+EXPORT_SYMBOL(is_maxim_ds_chan_valid);
+
+//maxim-chg
+bool is_maxim_chg_chan_valid(struct max77729_dev *max77729,
+                enum maxim_chg_ext_iio_channels chan)
+{
+        int rc;
+
+        if (IS_ERR(max77729->maxim_chg_ext_iio_chans[chan]))
+                return false;
+
+        if (!max77729->maxim_chg_ext_iio_chans[chan]) {
+                max77729->maxim_chg_ext_iio_chans[chan] = iio_channel_get(max77729->dev,
+                                        maxim_chg_ext_iio_chan_name[chan]);
+                if (IS_ERR(max77729->maxim_chg_ext_iio_chans[chan])) {
+                        rc = PTR_ERR(max77729->maxim_chg_ext_iio_chans[chan]);
+                        if (rc == -EPROBE_DEFER)
+                                max77729->maxim_chg_ext_iio_chans[chan] = NULL;
+
+                        pr_err("Failed to get IIO channel %s, rc=%d\n",
+                                maxim_chg_ext_iio_chan_name[chan], rc);
+                        return false;
+                }
+        }
+
+        return true;
+}
+EXPORT_SYMBOL(is_maxim_chg_chan_valid);
+
+//maxim-fg
+bool is_maxim_fg_chan_valid(struct max77729_dev *max77729,
+                enum maxim_fg_ext_iio_channels chan)
+{
+        int rc;
+
+        if (IS_ERR(max77729->maxim_fg_ext_iio_chans[chan]))
+                return false;
+
+        if (!max77729->maxim_fg_ext_iio_chans[chan]) {
+                max77729->maxim_fg_ext_iio_chans[chan] = iio_channel_get(max77729->dev,
+                                        maxim_fg_ext_iio_chan_name[chan]);
+                if (IS_ERR(max77729->maxim_fg_ext_iio_chans[chan])) {
+                        rc = PTR_ERR(max77729->maxim_fg_ext_iio_chans[chan]);
+                        if (rc == -EPROBE_DEFER)
+                                max77729->maxim_fg_ext_iio_chans[chan] = NULL;
+
+                        pr_err("Failed to get IIO channel %s, rc=%d\n",
+                                maxim_fg_ext_iio_chan_name[chan], rc);
+                        return false;
+                }
+        }
+
+        return true;
+}
+EXPORT_SYMBOL(is_maxim_fg_chan_valid);
+
+// nopmi-chg
+bool is_maxim_nopmi_chan_valid(struct max77729_dev *max77729,
+                enum maxim_nopmi_ext_iio_channels chan)
+{
+        int rc;
+
+        if (IS_ERR(max77729->maxim_ds_ext_iio_chans[chan]))
+                return false;
+
+        if (!max77729->maxim_nopmi_chg_ext_iio_chans[chan]) {
+                max77729->maxim_nopmi_chg_ext_iio_chans[chan] = iio_channel_get(max77729->dev,
+                                        maxim_nopmi_ext_iio_chan_name[chan]);
+                if (IS_ERR(max77729->maxim_nopmi_chg_ext_iio_chans[chan])) {
+                        rc = PTR_ERR(max77729->maxim_nopmi_chg_ext_iio_chans[chan]);
+                        if (rc == -EPROBE_DEFER)
+                                max77729->maxim_nopmi_chg_ext_iio_chans[chan] = NULL;
+
+                        pr_err("Failed to get IIO channel %s, rc=%d\n",
+                                maxim_nopmi_ext_iio_chan_name[chan], rc);
+                        return false;
+                }
+        }
+
+        return true;
+}
+EXPORT_SYMBOL(is_maxim_nopmi_chan_valid);
+
+static int max77729_ext_init_iio_psy(struct max77729_dev *max77729)
+{
+	if (!max77729)
+		return -ENOMEM;
+
+//ds28e16
+         pr_info("maxim_ds memory alloc start\n");
+	max77729->maxim_ds_ext_iio_chans = devm_kcalloc(max77729->dev,
+		        ARRAY_SIZE(maxim_ds_ext_iio_chan_name), sizeof(*max77729->maxim_ds_ext_iio_chans), GFP_KERNEL);
+	if (!max77729->maxim_ds_ext_iio_chans)
+		return -ENOMEM;
+         pr_info("maxim_ds memory alloc end\n");
+
+//maxim-chg
+         pr_info("maxim_chg memory alloc start\n");
+        max77729->maxim_chg_ext_iio_chans = devm_kcalloc(max77729->dev,
+                        ARRAY_SIZE(maxim_chg_ext_iio_chan_name), sizeof(*max77729->maxim_chg_ext_iio_chans), GFP_KERNEL);
+        if (!max77729->maxim_chg_ext_iio_chans)
+                return -ENOMEM;
+         pr_info("maxim_chg memory alloc end\n");
+
+//maxim-fg
+         pr_info("maxim_fg memory alloc start\n");
+        max77729->maxim_fg_ext_iio_chans = devm_kcalloc(max77729->dev,
+                        ARRAY_SIZE(maxim_fg_ext_iio_chan_name), sizeof(*max77729->maxim_fg_ext_iio_chans), GFP_KERNEL);
+        if (!max77729->maxim_fg_ext_iio_chans)
+                return -ENOMEM;
+         pr_info("maxim_fg memory alloc end\n");
+
+//maxim-nopmi
+         pr_info("maxim_nopmi memory alloc start\n");
+        max77729->maxim_nopmi_chg_ext_iio_chans = devm_kcalloc(max77729->dev,
+                        ARRAY_SIZE(maxim_nopmi_ext_iio_chan_name), sizeof(*max77729->maxim_nopmi_chg_ext_iio_chans), GFP_KERNEL);
+        if (!max77729->maxim_nopmi_chg_ext_iio_chans)
+                return -ENOMEM;
+         pr_info("maxim_nopmi memory alloc end\n");
+
+	return 0;
+}
+
+static int get_battery_id_from_ds(struct max77729_dev *max77729)
+{
+    int ret,value = 0, batt_id = -1;
+
+    // Now you can use max77729_dev as needed
+    if (is_maxim_ds_chan_valid(max77729, 0)) {
+ 	ret = max77729_get_iio_channel(max77729, MAXIM_DS, MAXIM_DS_CHIP_OK, &value);
+	if (ret < 0) {
+	pr_err("Failed to read IIO channel MAXIM_DS_CHIP_OK, ret=%d\n", ret);
+	 }
+      }
+
+    if (value == true) {
+        ret = max77729_get_iio_channel(max77729, MAXIM_DS, MAXIM_DS_PAGE0_DATA, &value);
+        if (ret < 0) {
+            pr_err("get page0 error ret=%d.\n", ret);
+            return ret;
+        } else {
+            pr_info("IIO channel MAXIM_DS_PAGE0_DATA value=%d\n", value);
+            if (value == 'N') {
+                batt_id = MAXIM_BATTERY_VENDOR_NVT;
+            } else if (value == 'C') {
+                batt_id = MAXIM_BATTERY_VENDOR_GY;
+            } else if (value == 'V') {
+                batt_id = MAXIM_BATTERY_VENDOR_GY;
+            } else if (value == 'L') {
+                batt_id = MAXIM_BATTERY_VENDOR_XWD;
+            } else if (value == 'S') {
+                batt_id = MAXIM_BATTERY_VENDOR_XWD;
+            } else if (value == 'X') {
+                batt_id = MAXIM_BATTERY_VENDOR_XWD;
+            }
+        }
+    }
+
+    pr_info("batt_id = %d.\n", batt_id);
+
+    return batt_id;
+}
+
+
+u8 fgauge_get_battery_id(struct max77729_dev *max77729)
+{
+    int rc;
+
+    // Call get_battery_id_from_ds and capture return code
+      rc = get_battery_id_from_ds(max77729);
+    if (rc <= MAXIM_BATTERY_VENDOR_START || rc >= MAXIM_BATTERY_VENDOR_UNKNOWN) {
+        max77729->batt_id = MAXIM_BATTERY_VENDOR_START;
+        if (!delayed_work_pending(&max77729->retry_battery_id_work)) {
+	        pr_err("Failed to get battery id = %d. Retrying after 2 sec\n", max77729->batt_id);
+            schedule_delayed_work(&max77729->retry_battery_id_work, 2*1000);
+        }
+    } else {
+        max77729->batt_id = rc;
+        pr_info("Successfully got battery id: %d\n", max77729->batt_id);
+    }
+
+    pr_info("fgauge_get_battery_id: get_battery_id = %d\n", max77729->batt_id);
+
+    return max77729->batt_id;
+}
+EXPORT_SYMBOL(fgauge_get_battery_id);
+
+static void retry_battery_id_func(struct work_struct *work)
+{
+    struct max77729_dev *max77729 = container_of(work,
+                    struct max77729_dev,
+                    retry_battery_id_work.work);
+    int batt_id;
+
+    pr_info("Attempting to get battery ID in retry function\n");
+    batt_id = get_battery_id_from_ds(max77729);
+
+    if (batt_id <= MAXIM_BATTERY_VENDOR_START || batt_id >= MAXIM_BATTERY_VENDOR_UNKNOWN) {
+        // Ensure work is not already pending before scheduling it again
+        if (!delayed_work_pending(&max77729->retry_battery_id_work)) {
+	        pr_err("Failed to get battery id, retrying after 2 sec\n");
+            schedule_delayed_work(&max77729->retry_battery_id_work, 2*1000);
+        }
+    } else {
+        pr_info("Successfully got battery id: %d\n", batt_id);
+    }
+}
+#endif
 
 static int max77729_i2c_probe(struct i2c_client *i2c,
 				const struct i2c_device_id *dev_id)
 {
-	struct max77729_dev *max77729;
 	struct max77729_platform_data *pdata = i2c->dev.platform_data;
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(5, 4, 0))
 	struct iio_dev *indio_dev = NULL;
@@ -827,12 +1134,13 @@ static int max77729_i2c_probe(struct i2c_client *i2c,
 		}
 
 		i2c->dev.platform_data = pdata;
-	} else
+	} else {
 		pdata = i2c->dev.platform_data;
-
+	}
 	max77729->dev = &i2c->dev;
 	max77729->i2c = i2c;
 	max77729->irq = i2c->irq;
+	max77729->dev->of_node = i2c->dev.of_node;
 	if (pdata) {
 		max77729->pdata = pdata;
 
@@ -842,9 +1150,9 @@ static int max77729_i2c_probe(struct i2c_client *i2c,
 					MFD_DEV_NAME, __func__, pdata->irq_base);
 			ret = -EINVAL;
 			goto err;
-		} else
+		} else {
 			max77729->irq_base = pdata->irq_base;
-
+		}
 		max77729->irq_gpio = pdata->irq_gpio;
 		max77729->wakeup = pdata->wakeup;
 		max77729->blocking_waterevent = pdata->blocking_waterevent;
@@ -853,6 +1161,13 @@ static int max77729_i2c_probe(struct i2c_client *i2c,
 		ret = -EINVAL;
 		goto err;
 	}
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(5, 4, 0))
+        max77729_ext_init_iio_psy(max77729);
+
+	INIT_DELAYED_WORK(&max77729->retry_battery_id_work, retry_battery_id_func); //retry for get battery id
+
+	schedule_delayed_work(&max77729->retry_battery_id_work, 0);
+#endif
 	mutex_init(&max77729->i2c_lock);
 
 	max77729->suspended = false;
@@ -944,7 +1259,7 @@ static int max77729_i2c_probe(struct i2c_client *i2c,
 	if (ret < 0)
 		goto err_irq_init;
 
-	ret = mfd_add_devices(max77729->dev, -1, max77729_devs,
+	ret = mfd_add_devices(max77729->dev, PLATFORM_DEVID_NONE, max77729_devs,
 			ARRAY_SIZE(max77729_devs), NULL, 0, NULL);
 	if (ret < 0)
 		goto err_mfd;
@@ -970,6 +1285,8 @@ err:
 static int max77729_i2c_remove(struct i2c_client *i2c)
 {
 	struct max77729_dev *max77729 = i2c_get_clientdata(i2c);
+
+        cancel_delayed_work_sync(&max77729->retry_iio_work);
 
 	device_init_wakeup(max77729->dev, 0);
 	max77729_irq_exit(max77729);

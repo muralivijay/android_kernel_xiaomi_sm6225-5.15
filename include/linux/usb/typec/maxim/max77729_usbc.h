@@ -425,8 +425,8 @@ extern const uint8_t BOOT_FLASH_FW_PASS2[];
 
 // #define DEBUG_MAX77729
 // #ifdef DEBUG_MAX77729
-// #define msg_maxim(format, args...) \
-		// pr_err("max77729: %s: " format "\n", __func__, ## args)
+//#define msg_maxim(format, args...) \
+//		 pr_err("max77729_usbc: %s: " format "\n", __func__, ## args)
 // #else
 #define msg_maxim(format, args...)
 // #endif [> DEBUG_MAX77766<]

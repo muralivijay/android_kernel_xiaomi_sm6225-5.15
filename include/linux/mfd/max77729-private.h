@@ -30,6 +30,9 @@
 #include <linux/i2c.h>
 #include <linux/usb/typec/maxim/max77729.h>
 #include <linux/mfd/max77729_common.h>
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(4, 19, 0))
+#include <linux/mfd/max77729-iio.h>
+#endif
 #define MAX77729_I2C_ADDR		(0x92)
 #define MAX77729_REG_INVALID		(0xff)
 
@@ -112,7 +115,7 @@ enum max77729_fuelgauge_reg {
 	SALRT_THRESHOLD_REG			= 0x03,
 	REMCAP_REP_REG				= 0x05,
 	SOCREP_REG				= 0x06,
-	AGES_REG				= 0x07,	
+	AGES_REG				= 0x07,
 	TEMPERATURE_REG				= 0x08,
 	VCELL_REG				= 0x09,
 	TIME_TO_EMPTY_REG			= 0x11,
@@ -354,7 +357,18 @@ struct max77729_dev {
 	struct i2c_client *debug; /* 0xC4; Debug */
 	struct mutex i2c_lock;
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(4, 19, 0))
+        struct delayed_work retry_iio_work;
+        struct delayed_work retry_battery_id_work;
+        int                     batt_id;
+        int retry_count;
+	bool fg_shutdown_delay;
+	u8 battery_id;
 	struct iio_dev  *maxim_indio_dev;
+	struct iio_chan_spec    *maxim_iio_chan;
+        struct iio_channel      **maxim_chg_ext_iio_chans;
+	struct iio_channel      **maxim_fg_ext_iio_chans;
+	struct iio_channel	**maxim_ds_ext_iio_chans;
+        struct iio_channel      **maxim_nopmi_chg_ext_iio_chans;
 #endif
 
 	int type;
@@ -393,7 +407,7 @@ struct max77729_dev {
 	u8 cc_booting_complete;
 
 	int set_altmode_en;
-	int enable_nested_irq;    
+	int enable_nested_irq;
 	u8 usbc_irq;
 
 	bool suspended;
@@ -415,6 +429,23 @@ enum max77729_types {
 	TYPE_MAX77729,
 };
 
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(4, 19, 0))
+enum max77729_iio_type {
+        MAXIM_DS,
+	MAXIM_CHG,
+	MAXIM_FG,
+        MAXIM_NOPMI,
+};
+
+enum {
+        MAXIM_BATTERY_VENDOR_START = 0,
+        MAXIM_BATTERY_VENDOR_GY = 1,
+        MAXIM_BATTERY_VENDOR_XWD = 2,
+        MAXIM_BATTERY_VENDOR_NVT = 3,
+        MAXIM_BATTERY_VENDOR_UNKNOWN = 4
+};
+#endif
+
 extern int max77729_irq_init(struct max77729_dev *max77729);
 extern void max77729_irq_exit(struct max77729_dev *max77729);
 
@@ -434,6 +465,23 @@ extern int max77729_update_reg(struct i2c_client *i2c, u8 reg, u8 val, u8 mask);
 /* MAX77729 check muic path function */
 extern bool is_muic_usb_path_ap_usb(void);
 extern bool is_muic_usb_path_cp_usb(void);
+
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(4, 19, 0))
+/* External iio channel*/
+extern int max77729_get_iio_channel(struct max77729_dev *max77729,
+			enum max77729_iio_type type, int channel, int *val);
+extern int max77729_set_iio_channel(struct max77729_dev *max77729,
+			enum max77729_iio_type type, int channel, int val);
+extern bool is_maxim_ds_chan_valid(struct max77729_dev *max77729,
+			enum maxim_ds_ext_iio_channels chan);
+extern bool is_maxim_chg_chan_valid(struct max77729_dev *max77729,
+                        enum maxim_chg_ext_iio_channels chan);
+extern bool is_maxim_fg_chan_valid(struct max77729_dev *max77729,
+                        enum maxim_fg_ext_iio_channels chan);
+extern bool is_maxim_nopmi_chan_valid(struct max77729_dev *max77729,
+                        enum maxim_nopmi_ext_iio_channels chan);
+extern u8 fgauge_get_battery_id(struct max77729_dev *max77729);
+#endif
 
 /* for charger api */
 extern void max77729_hv_muic_charger_init(void);

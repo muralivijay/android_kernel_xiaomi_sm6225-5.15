@@ -11,6 +11,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+#define pr_fmt(fmt)     "[MAX77729-PD] %s: " fmt, __func__
 
 #include <linux/kernel.h>
 #include <linux/version.h>
@@ -35,47 +36,6 @@
 #include <linux/usb/typec/maxim/max77729_alternate.h>
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
 #include <linux/qti_power_supply.h>
-#include <linux/iio/iio.h>
-#include <dt-bindings/iio/qti_power_supply_iio.h>
-#include <linux/iio/consumer.h>
-
-struct max77729_usb_data {
-	struct device *dev;
-	struct iio_channel **iio_channels;
-};
-
-enum iio_psy_property {
-	MAX77729_USB_PD_ACTIVE,
-};
-
-static const char * const iio_channel_map[] = {
-        [MAX77729_USB_PD_ACTIVE] = "pd_active",
-};
-
-static bool is_max77729_chan_valid(struct max77729_usb_data *chip,
-		enum iio_psy_property chan)
-{
-	int rc;
-
-	if (IS_ERR(chip->iio_channels[chan]))
-		return false;
-
-	if (!chip->iio_channels[chan]) {
-		chip->iio_channels[chan] = iio_channel_get(chip->dev,
-					iio_channel_map[chan]);
-		if (IS_ERR(chip->iio_channels[chan])) {
-			rc = PTR_ERR(chip->iio_channels[chan]);
-			if (rc == -EPROBE_DEFER)
-				chip->iio_channels[chan] = NULL;
-
-			pr_err("Failed to get IIO channel %s, rc=%d\n",
-				iio_channel_map[chan], rc);
-			return false;
-		}
-	}
-
-	return true;
-}
 #endif
 
 extern struct max77729_usbc_platform_data *g_usbc_data;
@@ -86,11 +46,12 @@ static void set_pd_active(struct max77729_usbc_platform_data *usbc_data, int pd_
 	int rc = 0;
 	union power_supply_propval val = {0,};
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
-        struct max77729_usb_data *maxd = NULL;
+	struct platform_device *pdev = to_platform_device(usbc_data->dev);
+	struct max77729_dev *max77729 = dev_get_drvdata(pdev->dev.parent);
 
-         if (!is_max77729_chan_valid(maxd, MAX77729_USB_PD_ACTIVE)) {
-        pr_err("IIO channel not valid for MAX77729_USB_PD_ACTIVE\n");
-    }
+	if (!max77729) {
+	pr_err("Failed to get max77729_dev from parent\n");
+	}
 #endif
 	pr_info("%s : set_pd_active %d\n", __func__, pd_active);
 
@@ -101,14 +62,21 @@ static void set_pd_active(struct max77729_usbc_platform_data *usbc_data, int pd_
 	if (usbc_data->usb_psy) {
 		val.intval = pd_active;
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
-                rc = iio_write_channel_raw(maxd->iio_channels[MAX77729_USB_PD_ACTIVE], val.intval);
+    if (is_maxim_chg_chan_valid(max77729, 0)) {
+        rc = max77729_set_iio_channel(max77729, MAXIM_CHG, MAXIM_CHG_PD_ACTIVE, val.intval);
+	if (rc < 0)
+		pr_err("Failed to set MAXIM_CHG_PD_ACTIVE iio ret =%d\n", rc);
+   }else {
+   		pr_err("Maxim pd_active iio channel invalid\n");
+   }		
 #else
 		rc = power_supply_set_property(usbc_data->usb_psy,
 			POWER_SUPPLY_PROP_PD_ACTIVE, &val);
-#endif
+
 		if (rc < 0)
 			pr_err("Couldn't read USB Present status, rc=%d\n", rc);
-
+			
+#endif
           //power_supply_changed(usbc_data->usb_psy);
 	}
 }

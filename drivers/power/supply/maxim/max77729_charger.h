@@ -377,6 +377,7 @@ struct max77729_charger_data {
 	struct i2c_client       *muic;
 
 	struct max77729_platform_data *max77729_pdata;
+        struct max77729_dev *max77729;
 
 	/*add by xiaomi start*/
 	struct delayed_work period_work;
@@ -394,15 +395,6 @@ struct max77729_charger_data {
 	struct votable		*fv_votable;
 	struct votable      *chgctrl_votable;
 	/*add by xiaomi end*/
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(4, 19, 0))
-	struct iio_dev  *indio_dev;
-	struct iio_chan_spec    *iio_chan;
-	struct iio_channel      *int_iio_chans;
-	struct iio_channel	**ds_ext_iio_chans;
-	struct iio_channel	**nopmi_chg_ext_iio_chans;
-	struct iio_channel	**fg_ext_iio_chans;
-	struct iio_channel	**main_iio;
-#endif
 
 	struct power_supply	*psy_chg;
 	struct power_supply	*psy_otg;
@@ -471,16 +463,6 @@ struct max77729_charger_data {
 };
 
 
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(4, 19, 0))
-enum max77729_charger_iio_type {
-	DS28E16,
-	MAX77729_CHG_BMS,
-	MAXIM_NOPMI,
-	MAX77729_CHG_MAIN,
-};
-#endif
-
-
 int max77729_usb_get_property(struct power_supply *psy,
 		enum power_supply_property psp,
 		union power_supply_propval *val);
@@ -497,16 +479,10 @@ int max77729_batt_set_property(struct power_supply *psy,
 		const union power_supply_propval *val);
 int batt_prop_is_writeable(struct power_supply *psy,
 		enum power_supply_property psp);
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(4, 19, 0))
-int max77729_charger_get_iio_channel(struct max77729_charger_data *chg,
-			enum max77729_charger_iio_type type, int channel, int *val);
-int max77729_charger_set_iio_channel(struct max77729_charger_data *chg,
-			enum max77729_charger_iio_type type, int channel, int val);
-int max77729_charger_iio_read_raw(struct iio_dev *indio_dev,
-                struct iio_chan_spec const *chan, int *val1,
-                int *val2, long mask);
-int max77729_charger_iio_write_raw(struct iio_dev *indio_dev,
-                struct iio_chan_spec const *chan, int val1,
-                int val2, long mask);
-#endif
+extern int max77729_set_fast_charge_mode(struct max77729_charger_data *charger, int pd_active);
+extern bool max77729_charger_unlock(struct max77729_charger_data *charger);
+extern void max77729_set_topoff_current(struct max77729_charger_data *charger,
+                                        int termination_current);
+extern void max77729_set_topoff_time(struct max77729_charger_data *charger,
+                                        int topoff_time);
 #endif /* __MAX77729_CHARGER_H */

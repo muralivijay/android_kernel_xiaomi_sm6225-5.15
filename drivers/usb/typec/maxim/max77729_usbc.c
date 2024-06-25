@@ -11,6 +11,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+#define pr_fmt(fmt)     "[MAX77729-usbc] %s: " fmt, __func__
 
 #include <linux/version.h>
 #include <linux/kernel.h>
@@ -31,9 +32,6 @@
 #include <linux/firmware.h>
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
 #include <linux/qti_power_supply.h>
-#include <linux/iio/iio.h>
-#include <dt-bindings/iio/qti_power_supply_iio.h>
-#include <linux/iio/consumer.h>
 #endif
 
 #define DRIVER_VER		"1.0VER"
@@ -46,47 +44,6 @@
 #define MAX77729_IRQSRC_CHG	(1 << 0)
 #define MAX77729_IRQSRC_FG      (1 << 2)
 #define MAX77729_IRQSRC_MUIC	(1 << 3)
-
-
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
-struct max77729_usb_data {
-	struct device *dev;
-	struct iio_channel **iio_channels;
-};
-
-enum iio_psy_property {
-	MAX77729_USB_REAL_TYPE,
-};
-
-static const char * const iio_channel_map[] = {
-        [MAX77729_USB_REAL_TYPE] = "usb_real_type",
-};
-
-static bool is_max77729_chan_valid(struct max77729_usb_data *chip,
-		enum iio_psy_property chan)
-{
-	int rc;
-
-	if (IS_ERR(chip->iio_channels[chan]))
-		return false;
-
-	if (!chip->iio_channels[chan]) {
-		chip->iio_channels[chan] = iio_channel_get(chip->dev,
-					iio_channel_map[chan]);
-		if (IS_ERR(chip->iio_channels[chan])) {
-			rc = PTR_ERR(chip->iio_channels[chan]);
-			if (rc == -EPROBE_DEFER)
-				chip->iio_channels[chan] = NULL;
-
-			pr_err("Failed to get IIO channel %s, rc=%d\n",
-				iio_channel_map[chan], rc);
-			return false;
-		}
-	}
-
-	return true;
-}
-#endif
 
 static const unsigned int extcon_cable[] = {
 	EXTCON_USB,
@@ -2054,17 +2011,16 @@ void max77729_send_get_request(struct max77729_usbc_platform_data *usbc_data, un
 	}
 }
 
+# if 1 //qc_debug_murali
 void max77729_handle_qc_result(struct max77729_muic_data *muic_data, unsigned char *data)
 {
 	int result = data[1];
 	union power_supply_propval pvalue ={0,};
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
-        struct max77729_usb_data *maxd = NULL;
-        int rc = 0;
+    struct max77729_dev *max77729 = g_usbc_data->max77729;
 
-         if (!is_max77729_chan_valid(maxd, MAX77729_USB_REAL_TYPE)) {
-        pr_err("IIO channel not valid for MAX77729_USB_REAL_TYPE\n");
-    }
+    if (!max77729)
+        pr_err("Failed to get max77729_dev from parent\n");
 #endif
 	pr_info("%s:%s result:0x%x vbadc:0x%x\n", MUIC_DEV_NAME,
 			__func__, data[1], data[2]);
@@ -2075,9 +2031,14 @@ void max77729_handle_qc_result(struct max77729_muic_data *muic_data, unsigned ch
 		g_usbc_data->is_hvdcp = true;
 		pvalue.intval = QTI_POWER_SUPPLY_TYPE_USB_HVDCP;
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
-                if (!g_usbc_data->usb_psy)
-		       g_usbc_data->usb_psy = power_supply_get_by_name("usb");
-                rc = iio_write_channel_raw(maxd->iio_channels[MAX77729_USB_REAL_TYPE], pvalue.intval);
+        if (!muic_data->psy_usb)
+               muic_data->psy_usb = power_supply_get_by_name("usb");
+        if (muic_data->psy_usb) {
+                max77729_set_iio_channel(max77729, MAXIM_CHG, MAXIM_CHG_USB_REAL_TYPE, pvalue.intval);
+                pr_info("USB_REAL_TYPE value=%d\n", pvalue.intval);
+        }else{
+                pr_err("Failed to set USB_REAL_TYPE iio for usb\n");
+        }
 #else
 		psy_do_property("usb", set, POWER_SUPPLY_PROP_REAL_TYPE, pvalue);
 #endif
@@ -2105,6 +2066,7 @@ void max77729_handle_qc_result(struct max77729_muic_data *muic_data, unsigned ch
 		break;
 	}
 }
+#endif
 
 static void max77729_irq_execute(struct max77729_usbc_platform_data *usbc_data,
 		const usbc_cmd_data *cmd_data)
@@ -2326,6 +2288,7 @@ static void max77729_irq_execute(struct max77729_usbc_platform_data *usbc_data,
 		msg_maxim("set altmode en to 1");
 		break;
 	case OPCODE_QC_2_0_SET:
+		msg_maxim("entering qc 2.0 switch case");
 		max77729_handle_qc_result(usbc_data->muic_data, data);
 		break;
 
@@ -3378,7 +3341,7 @@ static int max77729_usbc_probe(struct platform_device *pdev)
 	struct max77729_usbc_platform_data *usbc_data = NULL;
 	int ret;
 
-	msg_maxim("Probing : %d", max77729->irq);
+	pr_info("Probing : %d", max77729->irq);
 	usbc_data =  kzalloc(sizeof(struct max77729_usbc_platform_data), GFP_KERNEL);
 	if (!usbc_data)
 		return -ENOMEM;
@@ -3450,7 +3413,7 @@ static int max77729_usbc_probe(struct platform_device *pdev)
 	if (IS_ERR(usbc_data->port))
 		pr_err("unable to register typec_register_port\n");
 	else
-		msg_maxim("success typec_register_port port=%pK", usbc_data->port);
+		pr_info("success typec_register_port port=%pK", usbc_data->port);
 
 	max_adapter_class = class_create(THIS_MODULE, "Charging_Adapter");
 	if (IS_ERR(max_adapter_class)) {
@@ -3515,7 +3478,10 @@ static int max77729_usbc_probe(struct platform_device *pdev)
 
 	max77729_get_version_info(usbc_data);
 	max77729_init_irq_handler(usbc_data);
-	max77729_bc12_probe(usbc_data);
+	ret = max77729_bc12_probe(usbc_data);
+	if (ret < 0)
+		pr_err("Failed to probe max77729-muic\n");
+
 	max77729_cc_init(usbc_data);
 	max77729_pd_init(usbc_data);
 	max77729_write_reg(usbc_data->muic, REG_PD_INT_M, 0x1C);
@@ -3534,7 +3500,7 @@ static int max77729_usbc_probe(struct platform_device *pdev)
 
 //	schedule_delayed_work(&usbc_data->fw_update_work,
 //			msecs_to_jiffies(10000));
-	msg_maxim("probing Complete..");
+	pr_info("probing Complete..");
 
 	return 0;
 

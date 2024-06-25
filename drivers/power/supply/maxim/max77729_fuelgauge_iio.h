@@ -3,12 +3,22 @@
  * Copyright (c) 2020-2021 The Linux Foundation. All rights reserved.
  */
 
-#ifndef __MAX77729_FG_IIO_H
-#define __MAX77729_FG_IIO_H
+#ifndef __MAX77729_FUELGAUGE_IIO_H
+#define __MAX77729_FUELGAUGE_IIO_H
 
 #include <linux/iio/iio.h>
 #include <dt-bindings/iio/qti_power_supply_iio.h>
 #include <linux/qti_power_supply.h>
+#include "max77729_fuelgauge.h"
+
+struct max77729_fuelgauge_data_iio {
+	struct device           *dev;
+	struct max77729_fuelgauge_data *fg_data;
+	struct max77729_dev *max77729;
+	struct iio_dev  *indio_dev;
+	struct iio_chan_spec    *iio_chan;
+	struct iio_channel      *int_iio_chans;
+};
 
 struct max77729_fg_iio_channels {
 	const char *datasheet_name;
@@ -38,7 +48,6 @@ static const struct max77729_fg_iio_channels max77729_fg_iio_psy_channels[] = {
 	MAX77729_FG_CHAN_CURRENT("fastcharge_mode", PSY_IIO_FASTCHARGE_MODE)
 	MAX77729_FG_CHAN_CURRENT("battery_type", PSY_IIO_BATTERY_TYPE)
 	MAX77729_FG_CHAN_CURRENT("soh", PSY_IIO_SOH)
-	MAX77729_FG_CHAN_CURRENT("charge_ic_type", PSY_IIO_CHARGE_IC_TYPE)
 };
 
 #endif

@@ -102,6 +102,7 @@ struct max77729_muic_data {
 	struct i2c_client		*i2c; /* i2c addr: 0x4A; MUIC */
 	struct mutex			muic_mutex;
 	struct wakeup_source		*muic_ws;
+	struct power_supply		*psy_usb;
 	/* model dependent mfd platform data */
 	struct max77729_platform_data		*mfd_pdata;
 	struct max77729_usbc_platform_data	*usbc_pdata;

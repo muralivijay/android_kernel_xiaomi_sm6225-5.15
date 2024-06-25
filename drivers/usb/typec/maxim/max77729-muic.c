@@ -16,8 +16,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
- #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+#define pr_fmt(fmt)     "[MAX77729-MUIC] %s: " fmt, __func__
 
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -282,7 +281,7 @@ static void max77729_muic_print_reg_log(struct work_struct *work)
 	/* disable_irq(muic_data->irq_vbusdet); */
 /* } */
 
-
+#if 1 //qc_Debug_murali
 void max77729_set_qc(struct max77729_muic_data *muic_data, int voltage)
 {
 	struct max77729_usbc_platform_data *usbc_pdata = muic_data->usbc_pdata;
@@ -303,7 +302,7 @@ void max77729_set_qc(struct max77729_muic_data *muic_data, int voltage)
 	}
 
 	/* pr_info("%s:%s voltage(%d)\n", MUIC_DEV_NAME, __func__, voltage); */
-//	pr_info("%s:%s voltage(%d)\n", MUIC_DEV_NAME, __func__, voltage);
+	pr_info("%s:%s voltage(%d)\n", MUIC_DEV_NAME, __func__, voltage);
 
 	init_usbc_cmd_data(&write_data);
 	write_data.opcode = OPCODE_QC_2_0_SET;
@@ -313,6 +312,7 @@ void max77729_set_qc(struct max77729_muic_data *muic_data, int voltage)
 
 	max77729_usbc_opcode_write(usbc_pdata, &write_data);
 }
+#endif
 
 static void max77729_qc_work(struct work_struct *work)
 {
@@ -320,7 +320,7 @@ static void max77729_qc_work(struct work_struct *work)
 		container_of(work, struct max77729_muic_data, qc_work.work);
 	struct max77729_usbc_platform_data *usbc_pdata = muic_data->usbc_pdata;
 
-	/* pr_info("%s\n", __func__); */
+	 pr_info("%s\n", __func__);
 
     if(muic_data->chg_type == CHGTYP_DCP){
 		if((usbc_pdata->pd_data->psrdy_received)

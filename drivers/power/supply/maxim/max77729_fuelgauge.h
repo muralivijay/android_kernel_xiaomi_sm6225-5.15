@@ -52,14 +52,6 @@ enum {
 	BATTERY_VENDOR_XWD = 2,
 	BATTERY_VENDOR_UNKNOWN = 3
 };
-#else
-enum {
-	BATTERY_VENDOR_START = 0,
-	BATTERY_VENDOR_GY = 1,
-	BATTERY_VENDOR_XWD = 2,
-	BATTERY_VENDOR_NVT = 3,
-	BATTERY_VENDOR_UNKNOWN = 4
-};
 #endif
 
 ssize_t max77729_fg_show_attrs(struct device *dev,
@@ -240,19 +232,9 @@ struct max77729_fuelgauge_data {
 	struct power_supply	      *psy_batt;
 	struct delayed_work isr_work;
 	struct delayed_work shutdown_delay_work;
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(4, 19, 0))
-	struct iio_dev  *indio_dev;
-	struct iio_chan_spec    *iio_chan;
-	struct iio_channel      *int_iio_chans;
-	struct iio_channel	**ds_iio;
-	struct iio_channel	**bms_iio;
-	struct delayed_work retry_battery_id_work;
-	int	                batt_id;
-#endif
 
 	int cable_type;
 	bool is_charging;
-	bool is_fastcharge;
 	bool shutdown_delay_enable;
 	bool shutdown_delay;
 
@@ -291,6 +273,7 @@ struct max77729_fuelgauge_data {
 	unsigned int vempty_mode;
 	int temperature;
 	bool vempty_init_flag;
+	bool is_fastcharge;
 
 	int low_temp_limit;
 
@@ -320,5 +303,10 @@ struct max77729_fuelgauge_data {
 #endif
 	struct lost_soc_data lost_soc;
 };
+
+// extern some functions for iio-channel
+extern int max77729_fg_read_SoH(struct max77729_fuelgauge_data *fuelgauge);
+extern int max77729_fg_get_soc_decimal(struct max77729_fuelgauge_data *fuelgauge);
+extern int max77729_fg_get_soc_decimal_rate(struct max77729_fuelgauge_data *fuelgauge);
 
 #endif /* __MAX77729_FUELGAUGE_H */

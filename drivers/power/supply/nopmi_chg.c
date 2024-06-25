@@ -100,7 +100,7 @@ static const char * const power_supply_usbc_text[] = {
 	"Source attached (high current)",
 	"Non compliant",
 };
-
+#if 0
 static const char *get_usbc_text_name(u32 usb_type)
 {
 	u32 i = 0;
@@ -111,6 +111,7 @@ static const char *get_usbc_text_name(u32 usb_type)
 	}
 	return "Unknown";
 }
+#endif
 
 static const char * const power_supply_usb_type_text[] = {
 	"Unknown", "Battery", "UPS", "Mains", "USB",
@@ -155,7 +156,7 @@ extern void *charger_ipc_log_context;
 #define nopmi_err(fmt,...)
 #endif
 //add ipc log end
-
+#if 0
 static const char *get_usb_type_name(u32 usb_type)
 {
 	u32 i = 0;
@@ -166,6 +167,7 @@ static const char *get_usb_type_name(u32 usb_type)
 	}
 	return "Unknown";
 }
+
 static ssize_t usb_real_type_show(struct class *c,
 				struct class_attribute *attr, char *buf)
 {
@@ -902,6 +904,7 @@ static void generate_xm_charge_uvent(struct work_struct *work)
 
 	return;
 }
+#endif
 
 static bool is_bms_chan_valid(struct nopmi_chg *chip,
 		enum fg_ext_iio_channels chan)
@@ -1308,7 +1311,7 @@ static int nopmi_batt_get_prop_internal(struct power_supply *psy,
 				cancel_delayed_work_sync(&nopmi_chg->xm_prop_change_work);
 				schedule_delayed_work(&nopmi_chg->xm_prop_change_work, msecs_to_jiffies(100));
 			}else{
-				generate_xm_charge_uvent(&nopmi_chg->xm_prop_change_work.work);
+//				generate_xm_charge_uvent(&nopmi_chg->xm_prop_change_work.work); //debug by muralivijay
 			}
 			pval->intval = rc;
 		}
@@ -1444,7 +1447,6 @@ static int nopmi_batt_prop_is_writeable(struct power_supply *psy,
 {
 	if(NOPMI_CHARGER_IC_MAXIM == nopmi_get_charger_ic_type())
 	{
-//		return -1; //why error ?
 		return batt_prop_is_writeable(psy, psp);
 	}
 	else
@@ -1508,6 +1510,56 @@ static enum power_supply_property nopmi_usb_props[] = {
 	//POWER_SUPPLY_PROP_REAL_TYPE,
 };
 
+//usb_get_property
+static int nopmi_usb_get_prop_internal(struct power_supply *psy,
+		enum power_supply_property psp,
+		union power_supply_propval *val)
+
+{	int rc = 0;
+	int ret;
+	struct nopmi_chg *nopmi_chg = power_supply_get_drvdata(psy);
+	val->intval = 0;
+
+	pr_info("Entering usb_get_prop_internal\n");
+	switch (psp) {
+		case POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN:
+			break;
+		case POWER_SUPPLY_PROP_VOLTAGE_NOW:
+		case POWER_SUPPLY_PROP_CURRENT_NOW:
+		case POWER_SUPPLY_PROP_CHARGE_TERM_CURRENT:
+			if(!nopmi_chg->main_psy)
+				nopmi_chg->main_psy = power_supply_get_by_name("bbc");
+			if (nopmi_chg->main_psy) {
+				rc = power_supply_get_property(nopmi_chg->main_psy, psp, val);
+			}
+			break;
+		case POWER_SUPPLY_PROP_CURRENT_MAX:
+			break;
+		case POWER_SUPPLY_PROP_TYPE:
+			val->intval = POWER_SUPPLY_TYPE_USB_PD;
+			ret = 0;
+			break;
+		case POWER_SUPPLY_PROP_SCOPE:
+			break;
+		case POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT:
+			break;
+		case POWER_SUPPLY_PROP_POWER_NOW:
+			break;
+		case POWER_SUPPLY_PROP_AUTHENTIC:
+			val->intval = nopmi_chg->in_verified;
+		default:
+			rc = -EINVAL;
+			break;
+	}
+
+	if (rc < 0) {
+		pr_debug("Couldn't get prop %d rc = %d\n", psp, rc);
+		return -ENODATA;
+	}
+
+	return 0;
+}
+
 static int nopmi_usb_get_prop(struct power_supply *psy,
 		enum power_supply_property psp,
 		union power_supply_propval *val)
@@ -1521,9 +1573,10 @@ static int nopmi_usb_get_prop(struct power_supply *psy,
 	if(NOPMI_CHARGER_IC_MAXIM == nopmi_get_charger_ic_type())
 	{
 		ret = max77729_usb_get_property(psy, psp, val);
+	}else{
+		ret = nopmi_usb_get_prop_internal(psy, psp, val);
 	}
 
-	//pr_info(" 20220819 %s psp=%d,val->intval=%d",__func__, psp, val->intval);
 	switch (psp) {
 		case POWER_SUPPLY_PROP_PRESENT:
 			if(nopmi_chg->real_type > 0)
@@ -1553,38 +1606,14 @@ static int nopmi_usb_get_prop(struct power_supply *psy,
 				pr_err("%s : low power set POWER_SUPPLY_PROP_ONLINE=%d\n", __func__, val->intval);
 			}
 			break;
-		case POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN:
-			break;
-		case POWER_SUPPLY_PROP_VOLTAGE_NOW:
-		case POWER_SUPPLY_PROP_CURRENT_NOW:
-		case POWER_SUPPLY_PROP_CHARGE_TERM_CURRENT:
-			if(!nopmi_chg->main_psy)
-				nopmi_chg->main_psy = power_supply_get_by_name("bbc");
-			if (nopmi_chg->main_psy) {
-				rc = power_supply_get_property(nopmi_chg->main_psy, psp, val);
-			}
-			break;
-		case POWER_SUPPLY_PROP_CURRENT_MAX:
-			break;
-		case POWER_SUPPLY_PROP_TYPE:
-			val->intval = POWER_SUPPLY_TYPE_USB_PD;
-			ret = 0;
-			break;
-		case POWER_SUPPLY_PROP_SCOPE:
-			break;
-		case POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT:
-			break;
-		case POWER_SUPPLY_PROP_POWER_NOW:
-			break;
 		case POWER_SUPPLY_PROP_VOLTAGE_MAX:
 			val->intval = get_effective_result(nopmi_chg->fv_votable);
 			ret =0;
 			break;
-		case POWER_SUPPLY_PROP_AUTHENTIC:
-			val->intval = nopmi_chg->in_verified;
 		default:
 			break;
 	}
+
 	return ret;
 }
 
@@ -1598,6 +1627,36 @@ touchscreen_usb_piugin_data_t g_touchscreen_usb_pulgin = {0};
 EXPORT_SYMBOL(g_touchscreen_usb_pulgin);
 #endif
 
+//usb_set_property
+static int nopmi_usb_set_prop_internal(struct power_supply *psy,
+		enum power_supply_property psp,
+		const union power_supply_propval *val)
+{
+	struct nopmi_chg *nopmi_chg = power_supply_get_drvdata(psy);
+	int rc;
+
+	pr_info("Entering usb_set_prop_internal\n");
+	switch (psp) {
+		case POWER_SUPPLY_PROP_PRESENT:
+			break;
+		case POWER_SUPPLY_PROP_CHARGE_TERM_CURRENT:
+			rc = power_supply_set_property(nopmi_chg->main_psy, psp, val);
+			break;
+		case POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT:
+			break;
+		case POWER_SUPPLY_PROP_POWER_NOW:
+			break;
+		case POWER_SUPPLY_PROP_AUTHENTIC:
+			nopmi_chg->in_verified = val->intval;
+			break;
+		default:
+			rc = -EINVAL;
+			break;
+	}
+
+	return 0;
+}
+
 static int nopmi_usb_set_prop(struct power_supply *psy,
 		enum power_supply_property psp,
 		const union power_supply_propval *val)
@@ -1605,19 +1664,18 @@ static int nopmi_usb_set_prop(struct power_supply *psy,
 	struct nopmi_chg *nopmi_chg = power_supply_get_drvdata(psy);
 	int ret = 0;
 	int rc;
-	//longcheer nielianjie10 2022.10.13 add battery verify to limit charge current and modify battery verify logic
 	union power_supply_propval pval = {0, };
 	union power_supply_propval pval2 = {0, };
 
 	if(NOPMI_CHARGER_IC_MAXIM == nopmi_get_charger_ic_type())
 	{
 		ret = max77729_usb_set_property(psy, psp, val);
+	}else{
+		ret = nopmi_usb_set_prop_internal(psy, psp, val);
 	}
 
 	pr_info("psp=%d,val->intval=%d", psp, val->intval);
 	switch (psp) {
-		case POWER_SUPPLY_PROP_PRESENT:
-			break;
 		case POWER_SUPPLY_PROP_ONLINE:
 			nopmi_chg->usb_online = val->intval;
 			/* longcheer nielianjie10 2022.10.13 add battery verify to limit charge current and modify battery verify logic start */
@@ -1661,20 +1719,7 @@ static int nopmi_usb_set_prop(struct power_supply *psy,
 					g_touchscreen_usb_pulgin.event_callback();
 				}
 			#endif
-
 			break;
-		case POWER_SUPPLY_PROP_CHARGE_TERM_CURRENT:
-			rc = power_supply_set_property(nopmi_chg->main_psy, psp, val);
-			break;
-		case POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT:
-			break;
-		case POWER_SUPPLY_PROP_POWER_NOW:
-			break;
-		case POWER_SUPPLY_PROP_AUTHENTIC:
-			nopmi_chg->in_verified = val->intval;
-		/*case POWER_SUPPLY_PROP_REAL_TYPE:
-			nopmi_chg->real_type = val->intval;
-			break;*/
 		default:
 			break;
 	}
@@ -1691,7 +1736,7 @@ static int nopmi_usb_prop_is_writeable_internal(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_PRESENT:
 	case POWER_SUPPLY_PROP_POWER_NOW:
 	case POWER_SUPPLY_PROP_AUTHENTIC:
-    case POWER_SUPPLY_PROP_CHARGE_TERM_CURRENT:
+	case POWER_SUPPLY_PROP_CHARGE_TERM_CURRENT:
 		return 1;
 	default:
 		break;
@@ -1706,7 +1751,7 @@ static int nopmi_usb_prop_is_writeable(struct power_supply *psy,
 {
 	if(NOPMI_CHARGER_IC_MAXIM == nopmi_get_charger_ic_type())
 	{
-		return -1;
+		return usb_prop_is_writeable(psy, psp);
 	}
 	else
 	{
@@ -2266,8 +2311,12 @@ int nopmi_chg_get_iio_channel(struct nopmi_chg *chg,
 	}
 
 	rc = iio_read_channel_processed(iio_chan_list, val);
+//	if (rc < 0) {
+//		pr_err("Failed to read IIO channel: %d, error: %d\n", channel, rc);
+//	}
 
 	return rc < 0 ? rc : 0;
+//	return rc;
 }
 EXPORT_SYMBOL(nopmi_chg_get_iio_channel);
 
@@ -2304,19 +2353,22 @@ int nopmi_chg_set_iio_channel(struct nopmi_chg *chg,
 	}
 
 	rc = iio_write_channel_raw(iio_chan_list, val);
+//        if (rc < 0) {
+//                pr_err("Failed to read IIO channel: %d, error: %d\n", channel, rc);
+//        }
 
 	return rc < 0 ? rc : 0;
+//	return rc;
 }
 EXPORT_SYMBOL(nopmi_chg_set_iio_channel);
 
-
-static int nopmi_iio_write_raw_internal(struct iio_dev *indio_dev,
-                struct iio_chan_spec const *chan, int val1,
-                int val2, long mask)
+static int nopmi_chg_iio_write_raw(struct iio_dev *indio_dev,
+		struct iio_chan_spec const *chan, int val1,
+		int val2, long mask)
 {
-        struct nopmi_chg *chip = iio_priv(indio_dev);
-        int rc = 0;
-        static int old_real_type = POWER_SUPPLY_STATUS_UNKNOWN;
+	struct nopmi_chg *chip = iio_priv(indio_dev);
+	int rc = 0;
+	static int old_real_type = POWER_SUPPLY_STATUS_UNKNOWN;
 
 	switch (chan->channel) {
 	case PSY_IIO_PD_ACTIVE:
@@ -2374,12 +2426,15 @@ static int nopmi_iio_write_raw_internal(struct iio_dev *indio_dev,
 	case PSY_IIO_TYPEC_CC_ORIENTATION:
 		chip->cc_orientation = val1;
 		break;
-	case PSY_IIO_BATTERY_CHARGING_ENABLED:
+	case PSY_IIO_CHARGING_ENABLED:
 		set_prop_battery_charging_enabled(chip->jeita_ctl.usb_icl_votable, val1);
 		break;
 	case PSY_IIO_INPUT_SUSPEND:
 		pr_info("Set input suspend prop, value:%d\n", val1);
 		rc = nopmi_set_prop_input_suspend(chip, val1);
+		break;
+	case PSY_IIO_MTBF_CUR:
+		chip->mtbf_cur = val1;
 		break;
 	case PSY_IIO_APDO_VOLT:
 		chip->apdo_volt = val1;
@@ -2389,39 +2444,6 @@ static int nopmi_iio_write_raw_internal(struct iio_dev *indio_dev,
 		break;
 	case PSY_IIO_FFC_DISABLE:
 		g_ffc_disable = val1;
-		break;
-	default:
-		pr_info("Unsupported battery internal IIO chan %d\n", chan->channel);
-		rc = -EINVAL;
-		break;
-	}
-	if (rc < 0) {
-		pr_err_ratelimited("Couldn't write internal IIO channel %d, rc = %d\n",
-			chan->channel, rc);
-		return rc;
-	}
-	return IIO_VAL_INT;
-}
-
-static int nopmi_chg_iio_write_raw(struct iio_dev *indio_dev,
-		struct iio_chan_spec const *chan, int val1,
-		int val2, long mask)
-{
-	struct nopmi_chg *chip = iio_priv(indio_dev);
-	int rc = 0;
-
-      if (NOPMI_CHARGER_IC_MAXIM == nopmi_get_charger_ic_type())
-    {
-          rc = max77729_charger_iio_write_raw(indio_dev, chan, val1, val2, mask);
-    }
-    else
-    {
-          rc = nopmi_iio_write_raw_internal(indio_dev, chan, val1, val2, mask);
-    }
-
-	switch (chan->channel) {
-	case PSY_IIO_MTBF_CUR:
-		chip->mtbf_cur = val1;
 		break;
 	default:
 		pr_info("Unsupported battery IIO chan %d\n", chan->channel);
@@ -2436,12 +2458,12 @@ static int nopmi_chg_iio_write_raw(struct iio_dev *indio_dev,
 	return IIO_VAL_INT;
 }
 
-static int nopmi_chg_iio_read_raw_internal(struct iio_dev *indio_dev,
-                struct iio_chan_spec const *chan, int *val1,
-                int *val2, long mask)
+static int nopmi_chg_iio_read_raw(struct iio_dev *indio_dev,
+		struct iio_chan_spec const *chan, int *val1,
+		int *val2, long mask)
 {
-        struct nopmi_chg *chip = iio_priv(indio_dev);
-        int rc = 0;
+	struct nopmi_chg *chip = iio_priv(indio_dev);
+	int rc = 0;
 
 	*val1 = 0;
 
@@ -2491,53 +2513,21 @@ static int nopmi_chg_iio_read_raw_internal(struct iio_dev *indio_dev,
 			*val1 = 0;
 //HTH-260166 longcheer wangwei add typec status end
 		break;
-	case PSY_IIO_BATTERY_CHARGING_ENABLED:
+	case PSY_IIO_CHARGING_ENABLED:
 		get_prop_battery_charging_enabled(chip->jeita_ctl.usb_icl_votable, val1);
 		break;
 	case PSY_IIO_INPUT_SUSPEND:
 		*val1 = chip->input_suspend;
 		break;
-	case PSY_IIO_FFC_DISABLE:
-		*val1 = g_ffc_disable;
-		break;
-	default:
-		pr_debug("Unsupported battery IIO chan %d\n", chan->channel);
-		rc = -EINVAL;
-		break;
-	}
-	if (rc < 0) {
-		pr_err_ratelimited("Couldn't read IIO channel %d, rc = %d\n",
-			chan->channel, rc);
-		return rc;
-	}
-	return IIO_VAL_INT;
-}
-
-static int nopmi_chg_iio_read_raw(struct iio_dev *indio_dev,
-		struct iio_chan_spec const *chan, int *val1,
-		int *val2, long mask)
-{
-	struct nopmi_chg *chip = iio_priv(indio_dev);
-	int rc = 0;
-
-      if (NOPMI_CHARGER_IC_MAXIM == nopmi_get_charger_ic_type())
-    {
-          rc = max77729_charger_iio_read_raw(indio_dev, chan, val1, val2, mask);
-    }
-    else
-    {
-          rc = nopmi_chg_iio_read_raw_internal(indio_dev, chan, val1, val2, mask);
-    }
-
-	*val1 = 0;
-
-	switch (chan->channel) {
 	case PSY_IIO_MTBF_CUR:
 		*val1 = chip->mtbf_cur;
 		break;
-        case PSY_IIO_CHARGE_IC_TYPE:
-                *val1 = chip->charge_ic_type;
-                break;
+	case PSY_IIO_CHARGE_IC_TYPE:
+		*val1 = chip->charge_ic_type;
+		break;
+	case PSY_IIO_FFC_DISABLE:
+		*val1 = g_ffc_disable;
+		break;
 	default:
 		pr_debug("Unsupported battery IIO chan %d\n", chan->channel);
 		rc = -EINVAL;
@@ -2754,16 +2744,25 @@ static int nopmi_chg_probe(struct platform_device *pdev)
         goto err_free;
 	}
 
+        rc = nopmi_chg_get_iio_channel(nopmi_chg, NOPMI_MAIN, MAIN_CHARGE_IC_TYPE, &pval.intval);
+	if(rc == NOPMI_CHARGER_IC_MAXIM) {
+		pr_info("Maxim ic detected ret=%d\n", rc);
+	}else{
+		pr_err("Ic type not detected ret=%d", rc);
+	}
+
 	/* longcheer nielianjie10 2022.10.13 add battery verify to limit charge current and modify battery verify logic start */
 	rc = nopmi_chg_get_iio_channel(nopmi_chg, NOPMI_DS, DS_AUTHEN_RESULT, &pval.intval);
 	if (rc) {
 		if (probe_cnt <= PROBE_CNT_MAX) {
+			pr_err("DS_AUTHEN_RESULT not ready, defer probe ret=%d\n", rc);
 			return -EPROBE_DEFER;
 		} else {
 			pr_err("check ds chip fail, skip \n");
 		}
 	}
 	/* longcheer nielianjie10 2022.10.13 add battery verify to limit charge current and modify battery verify logic end */
+
 
 	pr_err("really start, probe_cnt = %d \n", probe_cnt);
 
@@ -2777,7 +2776,8 @@ static int nopmi_chg_probe(struct platform_device *pdev)
 	nopmi_chg->main_psy = main_psy;
 	rc = nopmi_chg_get_iio_channel(nopmi_chg, NOPMI_MAIN, MAIN_CHARGE_IC_TYPE, &pval.intval);
 	if (rc) {
-		nopmi_chg->charge_ic_type = NOPMI_CHARGER_IC_NONE;
+//		nopmi_chg->charge_ic_type = NOPMI_CHARGER_IC_NONE;
+	        nopmi_chg->charge_ic_type = NOPMI_CHARGER_IC_MAXIM; //set maxim-ic as default for spes compatibility
 	} else {
 		nopmi_chg->charge_ic_type = pval.intval;
 	}
@@ -2787,7 +2787,7 @@ static int nopmi_chg_probe(struct platform_device *pdev)
 
 	INIT_DELAYED_WORK(&nopmi_chg->nopmi_chg_work, nopmi_chg_workfunc);
 	INIT_DELAYED_WORK(&nopmi_chg->cvstep_monitor_work, nopmi_cv_step_monitor_work);
-	INIT_DELAYED_WORK( &nopmi_chg->xm_prop_change_work, generate_xm_charge_uvent);
+//	INIT_DELAYED_WORK( &nopmi_chg->xm_prop_change_work, generate_xm_charge_uvent); //debug by muralivijay
 //2021.09.21 wsy edit reomve vote to jeita
 #if 1
 	nopmi_chg->fcc_votable = find_votable("FCC");
@@ -2800,11 +2800,14 @@ static int nopmi_chg_probe(struct platform_device *pdev)
 	if((NOPMI_CHARGER_IC_SYV == nopmi_get_charger_ic_type()) || (NOPMI_CHARGER_IC_MAXIM == nopmi_get_charger_ic_type())||(NOPMI_CHARGER_IC_SC == nopmi_get_charger_ic_type()))
 		device_init_wakeup(nopmi_chg->dev, true);
 
-    rc = nopmi_init_iio_psy(nopmi_chg);
- 	if (rc < 0) {
-		pr_err("Failed to initialize nopmi IIO PSY, rc=%d\n", rc);
-		nopmi_err("Failed to initialize nopmi IIO PSY, rc=%d\n", rc);
-		goto err_free;
+// init internal iio channel only for sm5602 variant
+	if((NOPMI_CHARGER_IC_SYV == nopmi_get_charger_ic_type()) ||(NOPMI_CHARGER_IC_SC == nopmi_get_charger_ic_type())) {
+		rc = nopmi_init_iio_psy(nopmi_chg);
+		if (rc < 0) {
+			pr_err("Failed to initialize nopmi IIO PSY, rc=%d\n", rc);
+			nopmi_err("Failed to initialize nopmi IIO PSY, rc=%d\n", rc);
+			goto err_free;
+		}
 	}
 
 	rc = nopmi_init_batt_psy(nopmi_chg);
@@ -2824,12 +2827,12 @@ static int nopmi_chg_probe(struct platform_device *pdev)
 	g_nopmi_chg = nopmi_chg;
 	nopmi_init_config_ext(nopmi_chg);
 
-    rc = nopmi_chg_init_dev_class(nopmi_chg);
-	if (rc < 0) {
-		pr_err("Couldn't initialize batt psy rc=%d\n", rc);
-		nopmi_err("Couldn't initialize batt psy rc=%d\n", rc);
-		goto cleanup;
-    }
+//    rc = nopmi_chg_init_dev_class(nopmi_chg);
+//	if (rc < 0) {
+//		pr_err("Couldn't initialize batt psy rc=%d\n", rc);
+//		nopmi_err("Couldn't initialize batt psy rc=%d\n", rc);
+//		goto cleanup;
+//    }
 	pr_err("nopmi_chg probe successfully!\n");
 	nopmi_err("nopmi_chg probe successfully!\n");
 	return 0;
