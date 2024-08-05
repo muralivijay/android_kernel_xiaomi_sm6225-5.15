@@ -91,6 +91,7 @@ struct nopmi_chg {
 	struct delayed_work nopmi_chg_work;
 	struct delayed_work 	cvstep_monitor_work;
 	struct delayed_work	xm_prop_change_work;
+    struct delayed_work real_type_work;
 	int pd_active;
 	int in_verified;
 	int real_type;
@@ -104,6 +105,7 @@ struct nopmi_chg {
 	int input_suspend;
 	int mtbf_cur;
 	int update_cont;
+	struct notifier_block psy_real_type;
 	/*jeita config*/
 	struct nopmi_chg_jeita_st jeita_ctl;
 

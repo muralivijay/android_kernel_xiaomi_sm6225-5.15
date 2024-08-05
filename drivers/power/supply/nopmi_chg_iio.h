@@ -112,6 +112,7 @@ enum main_chg_ext_iio_channels {
 	MAIN_CHARGE_ENABLED,
 	MAIN_CHARGE_IC_TYPE,
 	MAIN_CHARGE_PD_ACTIVE,
+	MAIN_CHARGE_REAL_TYPE,
 };
 
 static const char * const main_chg_ext_iio_chan_name[] = {
@@ -119,6 +120,7 @@ static const char * const main_chg_ext_iio_chan_name[] = {
 	[MAIN_CHARGE_ENABLED] = "charge_enabled",
 	[MAIN_CHARGE_IC_TYPE] = "charge_ic_type",
 	[MAIN_CHARGE_PD_ACTIVE] = "charge_pd_active",
+	[MAIN_CHARGE_REAL_TYPE] = "usb_real_type",
 };
 
 #endif

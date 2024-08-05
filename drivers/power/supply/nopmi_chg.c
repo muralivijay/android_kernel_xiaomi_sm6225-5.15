@@ -10,6 +10,8 @@
 #include <linux/usb/typec/maxim/max77729_usbc.h> //MAXIM-IC
 
 #define PROBE_CNT_MAX	100
+#define MAX_RETRIES 6
+#define RETRY_DELAY_MS 1000
 #define MAIN_CHG_SUSPEND_VOTER "MAIN_CHG_SUSPEND_VOTER"
 #define CHG_INPUT_SUSPEND_VOTER "CHG_INPUT_SUSPEND_VOTER"
 #define THERMAL_DAEMON_VOTER            "THERMAL_DAEMON_VOTER"
@@ -100,7 +102,6 @@ static const char * const power_supply_usbc_text[] = {
 	"Source attached (high current)",
 	"Non compliant",
 };
-#if 0
 static const char *get_usbc_text_name(u32 usb_type)
 {
 	u32 i = 0;
@@ -111,7 +112,6 @@ static const char *get_usbc_text_name(u32 usb_type)
 	}
 	return "Unknown";
 }
-#endif
 
 static const char * const power_supply_usb_type_text[] = {
 	"Unknown", "Battery", "UPS", "Mains", "USB",
@@ -156,7 +156,7 @@ extern void *charger_ipc_log_context;
 #define nopmi_err(fmt,...)
 #endif
 //add ipc log end
-#if 0
+#if 1
 static const char *get_usb_type_name(u32 usb_type)
 {
 	u32 i = 0;
@@ -724,16 +724,27 @@ static DEVICE_ATTR(fastcharge_mode,0660,fastcharge_mode_show,NULL);
 //wangwei add module name end
 
 static struct attribute *battery_class_attrs[] = {
-        &class_attr_chip_ok.attr,
-        &class_attr_cp_bus_current.attr,
-        &class_attr_quick_charge_type.attr,
-        &class_attr_authentic.attr,
-        &class_attr_thermal_level.attr,
-        &class_attr_fg_batt_id.attr,
-        &class_attr_mtbf_current.attr,
-        &class_attr_cycle_count_select.attr,
-        &class_attr_pd_verifed.attr,
-        NULL,
+	&class_attr_soc_decimal.attr,
+	&class_attr_soc_decimal_rate.attr,
+	&class_attr_shutdown_delay.attr,
+	&class_attr_usb_real_type.attr,
+	&class_attr_real_type.attr,
+	&class_attr_chip_ok.attr,
+	&class_attr_typec_mode.attr,
+	&class_attr_typec_cc_orientation.attr,
+	&class_attr_resistance_id.attr,
+	&class_attr_cp_bus_current.attr,
+	&class_attr_input_suspend.attr,
+	&class_attr_quick_charge_type.attr,
+	&class_attr_mtbf_current.attr,
+	//&class_attr_resistance.attr,
+	&class_attr_authentic.attr,
+	&class_attr_pd_verifed.attr,
+	&class_attr_apdo_max.attr,
+	&class_attr_thermal_level.attr,
+	&class_attr_fg_batt_id.attr,
+	&class_attr_cycle_count_select.attr,
+	NULL,
 };
 ATTRIBUTE_GROUPS(battery_class);
 
@@ -742,18 +753,24 @@ static struct attribute *battery_attributes[] = {
 	&dev_attr_cp_manufacturer.attr,
 	&dev_attr_ds_modle_name.attr,
 	&dev_attr_ds_manufacturer.attr,
+        &dev_attr_fastcharge_mode.attr,
+        &dev_attr_batt_manufacturer.attr,
 	//&dev_attr_real_type.attr,
 	//&dev_attr_input_suspend.attr,
 	NULL,
 };
 
 static struct attribute *battery_attributes_sm5602[] = {
+        &dev_attr_cp_modle_name.attr,
+        &dev_attr_cp_manufacturer.attr,
+        &dev_attr_ds_modle_name.attr,
+        &dev_attr_ds_manufacturer.attr,
+        &dev_attr_fastcharge_mode.attr,
         &dev_attr_cc_modle_name.attr,
         &dev_attr_cc_manufacturer.attr,
         &dev_attr_batt_manufacturer.attr,
         //&dev_attr_real_type.attr,
         //&dev_attr_input_suspend.attr,
-        &dev_attr_fastcharge_mode.attr,
         NULL,
 };
 
@@ -777,24 +794,9 @@ static const struct attribute_group *battery_attr_sm5602_groups[] = {
 
 static int nopmi_chg_init_dev_class(struct nopmi_chg *chg)
 {
-        int num_attributes = 0;
 	int rc = -EINVAL;
 	if(!chg)
 		return rc;
-
-        // Include attributes based on the power IC type
-        if (NOPMI_CHARGER_IC_MAXIM != nopmi_get_charger_ic_type()) {
-          battery_class_attrs[num_attributes++] = &class_attr_usb_real_type.attr;
-          battery_class_attrs[num_attributes++] = &class_attr_shutdown_delay.attr;
-          battery_class_attrs[num_attributes++] = &class_attr_soc_decimal.attr;
-          battery_class_attrs[num_attributes++] = &class_attr_soc_decimal_rate.attr;
-          battery_class_attrs[num_attributes++] = &class_attr_input_suspend.attr;
-          battery_class_attrs[num_attributes++] = &class_attr_typec_cc_orientation.attr;
-          battery_class_attrs[num_attributes++] = &class_attr_typec_mode.attr;
-          battery_class_attrs[num_attributes++] = &class_attr_resistance_id.attr;
-          battery_class_attrs[num_attributes++] = &class_attr_apdo_max.attr;
-          battery_class_attrs[num_attributes++] = &class_attr_real_type.attr;
-       }
 
 	chg->battery_class.name = "qcom-battery";
 	chg->battery_class.class_groups = battery_class_groups;
@@ -1311,7 +1313,7 @@ static int nopmi_batt_get_prop_internal(struct power_supply *psy,
 				cancel_delayed_work_sync(&nopmi_chg->xm_prop_change_work);
 				schedule_delayed_work(&nopmi_chg->xm_prop_change_work, msecs_to_jiffies(100));
 			}else{
-//				generate_xm_charge_uvent(&nopmi_chg->xm_prop_change_work.work); //debug by muralivijay
+				generate_xm_charge_uvent(&nopmi_chg->xm_prop_change_work.work);
 			}
 			pval->intval = rc;
 		}
@@ -1499,6 +1501,7 @@ static enum power_supply_property nopmi_usb_props[] = {
 	POWER_SUPPLY_PROP_CURRENT_NOW,
 	POWER_SUPPLY_PROP_CURRENT_MAX,
 	POWER_SUPPLY_PROP_TYPE,
+    POWER_SUPPLY_PROP_CHARGE_TYPE,
 	POWER_SUPPLY_PROP_VOLTAGE_MAX,
 	POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN,
 	POWER_SUPPLY_PROP_SCOPE,
@@ -1719,7 +1722,7 @@ static int nopmi_usb_set_prop(struct power_supply *psy,
 					g_touchscreen_usb_pulgin.event_callback();
 				}
 			#endif
-			break;
+			break;	
 		default:
 			break;
 	}
@@ -2169,7 +2172,6 @@ static int nopmi_select_cycle(struct nopmi_chg *nopmi_chg)
 }
 
 /*longcheer nielianjie10 2022.12.05 Set CV according to circle count end*/
-
 static void  nopmi_cv_step_monitor_work(struct work_struct *work)
 {
 #if 1
@@ -2311,12 +2313,8 @@ int nopmi_chg_get_iio_channel(struct nopmi_chg *chg,
 	}
 
 	rc = iio_read_channel_processed(iio_chan_list, val);
-//	if (rc < 0) {
-//		pr_err("Failed to read IIO channel: %d, error: %d\n", channel, rc);
-//	}
 
 	return rc < 0 ? rc : 0;
-//	return rc;
 }
 EXPORT_SYMBOL(nopmi_chg_get_iio_channel);
 
@@ -2353,12 +2351,8 @@ int nopmi_chg_set_iio_channel(struct nopmi_chg *chg,
 	}
 
 	rc = iio_write_channel_raw(iio_chan_list, val);
-//        if (rc < 0) {
-//                pr_err("Failed to read IIO channel: %d, error: %d\n", channel, rc);
-//        }
 
 	return rc < 0 ? rc : 0;
-//	return rc;
 }
 EXPORT_SYMBOL(nopmi_chg_set_iio_channel);
 
@@ -2385,8 +2379,10 @@ static int nopmi_chg_iio_write_raw(struct iio_dev *indio_dev,
 
 		if (chip) {
 			chip->update_cont = 15;
+//            if (NOPMI_CHARGER_IC_MAXIM != nopmi_get_charger_ic_type()) {
 			cancel_delayed_work_sync(&chip->xm_prop_change_work);
 			schedule_delayed_work(&chip->xm_prop_change_work, msecs_to_jiffies(100));
+//            }
 		} else {
 			pr_err("uevent: chip or chip->xm_prop_change_work is NULL !\n");
 		}
@@ -2677,7 +2673,27 @@ static void nopmi_init_config_ext(struct nopmi_chg *nopmi_chg)
 		pr_err("get pd active from charge ic fail\n");
 	}
 
+	if(NOPMI_CHARGER_IC_MAXIM == nopmi_get_charger_ic_type()) {
+        pr_info("reading real_type from maxim charger\n");
+		if(!nopmi_chg->usb_psy)
+			nopmi_chg->usb_psy = power_supply_get_by_name("usb");
+		if (nopmi_chg->usb_psy) {
+	        	rc = power_supply_get_property(nopmi_chg->usb_psy, POWER_SUPPLY_PROP_CHARGE_TYPE, &pval);
+        	if(pval.intval <= 0) {
+            	pr_err("retrying to get real_type from maxim charger value is =%d\n", pval.intval);
+            	schedule_delayed_work(&nopmi_chg->real_type_work, msecs_to_jiffies(RETRY_DELAY_MS));
+		}else{
+        		pr_info("succesfully got maxim real_type value: %d\n", pval.intval);		
+        		cancel_delayed_work_sync(&nopmi_chg->real_type_work);
+    		}
+		}else{
+        		pr_err("failed to get usb power_supply for real_type\n");
+		}
+	}else {
+	pr_info("reading real_type from main charger. bq\n");
 	rc = power_supply_get_property(nopmi_chg->main_psy, POWER_SUPPLY_PROP_CHARGE_TYPE, &pval);
+	}
+
 	if (!rc) {
 		nopmi_chg->real_type = pval.intval;
 		if (nopmi_chg->real_type != POWER_SUPPLY_TYPE_UNKNOWN)
@@ -2689,6 +2705,56 @@ static void nopmi_init_config_ext(struct nopmi_chg *nopmi_chg)
 		pr_err("get charger type from charge ic fail\n");
 	}
 	/*  init usbonline pd_active and realtype from charge ic */
+}
+
+/* Maxim real_type retry */
+void nopmi_chg_real_type_work(struct work_struct *work)
+{
+    struct delayed_work *dwork = to_delayed_work(work);
+    struct nopmi_chg *nopmi_chg = container_of(dwork, struct nopmi_chg, real_type_work);
+    union power_supply_propval pval={0, };
+    static int retry_count = 0;
+    int rc;
+
+    retry_count++;
+      rc = power_supply_get_property(nopmi_chg->usb_psy, POWER_SUPPLY_PROP_CHARGE_TYPE, &pval);
+    if (pval.intval <= 0 && retry_count < MAX_RETRIES) {
+        pr_err("Retring to get charge type from maxim charger. value is %d", pval.intval);
+        schedule_delayed_work(&nopmi_chg->real_type_work, msecs_to_jiffies(RETRY_DELAY_MS));
+    } else if (retry_count >= MAX_RETRIES) {
+        nopmi_chg->real_type = POWER_SUPPLY_TYPE_UNKNOWN;
+        pr_err("Failed to get valid POWER_SUPPLY_PROP_CHARGE_TYPE after %d retries\n", MAX_RETRIES);
+        cancel_delayed_work_sync(&nopmi_chg->real_type_work);
+    } else {
+        pr_info("Successfully got real_type from maxim value is %d", pval.intval);
+	nopmi_chg->real_type = pval.intval;
+        cancel_delayed_work_sync(&nopmi_chg->real_type_work);
+    }
+}
+
+/* Maxim real_type notifier */
+static int nopmi_chg_real_type_notifier(struct notifier_block *nb, unsigned long event, void *data)
+{
+    struct power_supply *psy = data;
+    struct nopmi_chg *nopmi_chg = container_of(nb, struct nopmi_chg, psy_real_type);
+    union power_supply_propval pval;
+    int rc;
+
+    if (event != PSY_EVENT_PROP_CHANGED)
+        return NOTIFY_OK;
+
+    if (psy != nopmi_chg->usb_psy)
+        return NOTIFY_OK;
+
+    rc = power_supply_get_property(nopmi_chg->usb_psy, POWER_SUPPLY_PROP_CHARGE_TYPE, &pval);
+    if (!rc) {
+        nopmi_chg->real_type = pval.intval;
+        pr_info("Updated charge type from maxim-charger IC: %d", nopmi_chg->real_type);
+    } else {
+        pr_err("Failed to get POWER_SUPPLY_PROP_CHARGE_TYPE: %d\n", rc);
+    }
+
+    return NOTIFY_OK;
 }
 
 static int nopmi_chg_probe(struct platform_device *pdev)
@@ -2737,18 +2803,12 @@ static int nopmi_chg_probe(struct platform_device *pdev)
 
 	nopmi_init_config(nopmi_chg);
 	nopmi_chg->cycle_count = 0;
+
 	rc = nopmi_chg_ext_init_iio_psy(nopmi_chg);
 	if (rc < 0) {
 		pr_err("Failed to initialize nopmi chg ext IIO PSY, rc=%d\n", rc);
 		nopmi_err("Failed to initialize nopmi chg ext IIO PSY, rc=%d\n", rc);
         goto err_free;
-	}
-
-        rc = nopmi_chg_get_iio_channel(nopmi_chg, NOPMI_MAIN, MAIN_CHARGE_IC_TYPE, &pval.intval);
-	if(rc == NOPMI_CHARGER_IC_MAXIM) {
-		pr_info("Maxim ic detected ret=%d\n", rc);
-	}else{
-		pr_err("Ic type not detected ret=%d", rc);
 	}
 
 	/* longcheer nielianjie10 2022.10.13 add battery verify to limit charge current and modify battery verify logic start */
@@ -2776,38 +2836,41 @@ static int nopmi_chg_probe(struct platform_device *pdev)
 	nopmi_chg->main_psy = main_psy;
 	rc = nopmi_chg_get_iio_channel(nopmi_chg, NOPMI_MAIN, MAIN_CHARGE_IC_TYPE, &pval.intval);
 	if (rc) {
-//		nopmi_chg->charge_ic_type = NOPMI_CHARGER_IC_NONE;
-	        nopmi_chg->charge_ic_type = NOPMI_CHARGER_IC_MAXIM; //set maxim-ic as default for spes compatibility
+		nopmi_chg->charge_ic_type = NOPMI_CHARGER_IC_NONE;
 	} else {
 		nopmi_chg->charge_ic_type = pval.intval;
 	}
 	pr_info("nopmi_chg->charge_ic_type = %d\n", nopmi_chg->charge_ic_type);
 
+	g_nopmi_chg = nopmi_chg; //now pass nopmi_chg data
+
 	nopmi_chg_jeita_init(&nopmi_chg->jeita_ctl);
 
 	INIT_DELAYED_WORK(&nopmi_chg->nopmi_chg_work, nopmi_chg_workfunc);
 	INIT_DELAYED_WORK(&nopmi_chg->cvstep_monitor_work, nopmi_cv_step_monitor_work);
-//	INIT_DELAYED_WORK( &nopmi_chg->xm_prop_change_work, generate_xm_charge_uvent); //debug by muralivijay
+	INIT_DELAYED_WORK(&nopmi_chg->xm_prop_change_work, generate_xm_charge_uvent);
+    INIT_DELAYED_WORK(&nopmi_chg->real_type_work, nopmi_chg_real_type_work);
 //2021.09.21 wsy edit reomve vote to jeita
 #if 1
 	nopmi_chg->fcc_votable = find_votable("FCC");
 	nopmi_chg->fv_votable = find_votable("FV");
 	nopmi_chg->usb_icl_votable = find_votable("USB_ICL");
+if (NOPMI_CHARGER_IC_MAXIM != nopmi_get_charger_ic_type()) {
 	nopmi_chg->chg_dis_votable = find_votable("CHG_DISABLE");
+	}
 #endif
 	schedule_delayed_work(&nopmi_chg->nopmi_chg_work, msecs_to_jiffies(NOPMI_CHG_WORKFUNC_FIRST_GAP));
 	schedule_delayed_work(&nopmi_chg->xm_prop_change_work, msecs_to_jiffies(30000));
-	if((NOPMI_CHARGER_IC_SYV == nopmi_get_charger_ic_type()) || (NOPMI_CHARGER_IC_MAXIM == nopmi_get_charger_ic_type())||(NOPMI_CHARGER_IC_SC == nopmi_get_charger_ic_type()))
-		device_init_wakeup(nopmi_chg->dev, true);
 
-// init internal iio channel only for sm5602 variant
-	if((NOPMI_CHARGER_IC_SYV == nopmi_get_charger_ic_type()) ||(NOPMI_CHARGER_IC_SC == nopmi_get_charger_ic_type())) {
-		rc = nopmi_init_iio_psy(nopmi_chg);
-		if (rc < 0) {
-			pr_err("Failed to initialize nopmi IIO PSY, rc=%d\n", rc);
-			nopmi_err("Failed to initialize nopmi IIO PSY, rc=%d\n", rc);
-			goto err_free;
-		}
+	if((NOPMI_CHARGER_IC_SYV == nopmi_get_charger_ic_type()) || (NOPMI_CHARGER_IC_MAXIM == nopmi_get_charger_ic_type())||(NOPMI_CHARGER_IC_SC == nopmi_get_charger_ic_type())) {
+		device_init_wakeup(nopmi_chg->dev, true);
+	}
+
+	rc = nopmi_init_iio_psy(nopmi_chg);
+	if (rc < 0) {
+		pr_err("Failed to initialize nopmi IIO PSY, rc=%d\n", rc);
+		nopmi_err("Failed to initialize nopmi IIO PSY, rc=%d\n", rc);
+		goto err_free;
 	}
 
 	rc = nopmi_init_batt_psy(nopmi_chg);
@@ -2817,6 +2880,7 @@ static int nopmi_chg_probe(struct platform_device *pdev)
 		goto cleanup;
 	}
 
+
 	rc = nopmi_init_usb_psy(nopmi_chg);
 	if (rc < 0) {
 		pr_err("Couldn't initialize usb psy rc=%d\n", rc);
@@ -2824,15 +2888,25 @@ static int nopmi_chg_probe(struct platform_device *pdev)
 		goto cleanup;
 	}
 
-	g_nopmi_chg = nopmi_chg;
 	nopmi_init_config_ext(nopmi_chg);
 
-//    rc = nopmi_chg_init_dev_class(nopmi_chg);
-//	if (rc < 0) {
-//		pr_err("Couldn't initialize batt psy rc=%d\n", rc);
-//		nopmi_err("Couldn't initialize batt psy rc=%d\n", rc);
-//		goto cleanup;
-//    }
+if (NOPMI_CHARGER_IC_MAXIM == nopmi_get_charger_ic_type()) {	
+	// Register the notifier callback
+	nopmi_chg->psy_real_type.notifier_call = nopmi_chg_real_type_notifier;
+	rc = power_supply_reg_notifier(&nopmi_chg->psy_real_type);
+	if (rc) {
+	pr_err("Failed to register power supply notifier for real_type: %d\n", rc);
+	return rc;
+	}
+}	
+
+	rc = nopmi_chg_init_dev_class(nopmi_chg);
+	if (rc < 0) {
+		pr_err("Couldn't initialize batt psy rc=%d\n", rc);
+		nopmi_err("Couldn't initialize batt psy rc=%d\n", rc);
+		goto cleanup;
+	}
+
 	pr_err("nopmi_chg probe successfully!\n");
 	nopmi_err("nopmi_chg probe successfully!\n");
 	return 0;
