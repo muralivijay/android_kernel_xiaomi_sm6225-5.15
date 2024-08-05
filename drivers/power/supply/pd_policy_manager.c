@@ -115,6 +115,9 @@ static struct usbpd_pm *__pdpm;
 static int fc2_taper_timer;
 static int ibus_lmt_change_timer;
 
+//maxim
+extern int usbpd_select_pdo_maxim(int pdo, int mv, int ma);
+
 enum cp_iio_type {
 	CP_MASTER,
 	CP_SLAVE,
@@ -698,7 +701,15 @@ static int usbpd_select_pdo(struct usbpd_pm *pdpm, u32 mV, u32 mA)
 	int ret, cnt = 0;
 
 	if(NOPMI_CHARGER_IC_MAXIM == nopmi_get_charger_ic_type()) {
-		return -1;
+//		return -1;
+		if(!pdpm)
+		{
+			return usbpd_select_pdo_maxim(0, mV, mA);
+		}
+		else
+		{
+			return usbpd_select_pdo_maxim(pdpm->apdo_selected_pdo, mV, mA);
+		}
 	} else {
 		if (check_typec_attached_snk(pdpm->tcpc) < 0)
 			return -EINVAL;
@@ -1004,6 +1015,43 @@ static int usbpd_pm_check_sw_enabled(struct usbpd_pm *pdpm)
 		pdpm->sw.charge_enabled = !!val.intval;
 
 	return ret;
+}
+
+//maxim
+static void usbpd_pm_evaluate_src_caps_maxim(struct usbpd_pm *pdpm)
+{
+    //int ret;
+    int i;
+
+    pdpm->pdo = usbpd_fetch_pdo();
+    pr_err("usbpd_pm_evaluate_src_caps::0x%x\n", (char *)pdpm->pdo);
+
+    pdpm->apdo_max_volt = pm_config.min_adapter_volt_required;
+    pdpm->apdo_max_curr = pm_config.min_adapter_curr_required;
+
+    for (i = 0; i < 7; i++) {
+        pr_err("[SC manager] %d type %d\n", i, pdpm->pdo[i].apdo);
+
+        if (pdpm->pdo[i].apdo == true) {
+            if (pdpm->pdo[i].max_voltage >= pdpm->apdo_max_volt
+                    && pdpm->pdo[i].max_current > pdpm->apdo_max_curr) {
+                pdpm->apdo_max_volt = pdpm->pdo[i].max_voltage;
+                pdpm->apdo_max_curr = pdpm->pdo[i].max_current;
+                pdpm->apdo_selected_pdo = i;
+                pdpm->pps_supported = true;
+                pr_err("[SC manager] vola %d  curr %d\n", 
+                        pdpm->apdo_max_volt, pdpm->apdo_max_curr);
+            }		
+        }
+    }
+
+    if (pdpm->pps_supported)
+        pr_notice("PPS supported, preferred APDO pos:%d, max volt:%d, current:%d\n",
+                pdpm->apdo_selected_pdo,
+                pdpm->apdo_max_volt,
+                pdpm->apdo_max_curr);
+    else
+        pr_notice("Not qualified PPS adapter\n");
 }
 
 #if 0
@@ -1658,6 +1706,7 @@ static void usbpd_pd_contact(struct usbpd_pm *pdpm, bool connected)
 	if (connected) {
 		msleep(10);
 		if(NOPMI_CHARGER_IC_MAXIM == nopmi_get_charger_ic_type()) {
+			usbpd_pm_evaluate_src_caps_maxim(pdpm);		
 		} else {
 			usbpd_pm_evaluate_src_caps(pdpm);
 		}
@@ -1849,21 +1898,27 @@ static int usbpd_pm_probe(struct platform_device *pdev)
 	}
 	probe_cnt ++;
 
-	if (!pdev->dev.of_node)
+	if (!pdev->dev.of_node) {
+        pr_err("of_node not found return invaild device\n");
 		return -ENODEV;
+    }
 
 	//get usb phy, tcpc port
 	usb_psy = power_supply_get_by_name("usb");
 	if (IS_ERR_OR_NULL(usb_psy)) {
+        pr_err("usb power_supply_not found. defer probe\n");
 			return -EPROBE_DEFER;
 	}
 
-	tcpc = tcpc_dev_get_by_name("type_c_port0");
-	if (IS_ERR_OR_NULL(tcpc)) {
-		if (usb_psy)
-			power_supply_put(usb_psy);
-		return -EPROBE_DEFER;
-	}
+	if(NOPMI_CHARGER_IC_MAXIM != nopmi_get_charger_ic_type()) {
+	    tcpc = tcpc_dev_get_by_name("type_c_port0");
+	    if (IS_ERR_OR_NULL(tcpc)) {
+            pr_err("type_c_port0 not found. defer probe\n");
+		    if (usb_psy)
+			    power_supply_put(usb_psy);
+		    return -EPROBE_DEFER;
+	    }
+    }
 
 	if (pdev->dev.of_node) {
 		pdpm = devm_kzalloc(&pdev->dev,
