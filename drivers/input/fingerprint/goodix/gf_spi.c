@@ -79,25 +79,12 @@
 #define PROC_NAME "hwinfo"
 static struct proc_dir_entry *proc_entry;
 static int SPIDEV_MAJOR;
-int fpsensor = 0;
-module_param_named(fpsensor, fpsensor, int, 0644);
-MODULE_PARM_DESC(fpsensor, "fingerprint ic vendor");
 static DECLARE_BITMAP(minors, N_SPI_MINORS);
 static LIST_HEAD(device_list);
 static DEFINE_MUTEX(device_list_lock);
 static struct wakeup_source *fp_wakelock;
 static struct gf_dev gf;
-//extern int fpsensor;
-/*
-char fp_info[32] = {0};
-static int __init fingerprint_info(char *str)
-{
-    strcpy(fp_info, str);
-    pr_info("[fingerprint_info]This is goodix fingerprint\n");
-    return 1;
-}
-__setup("androidboot.fpsensor=", fingerprint_info);
-*/
+
 struct gf_key_map maps[] = {
 	{ EV_KEY, GF_KEY_INPUT_HOME },
 	{ EV_KEY, GF_KEY_INPUT_MENU },
@@ -796,7 +783,6 @@ static int gf_probe(struct platform_device *pdev)
 	int status = -EINVAL;
 	unsigned long minor;
 	int i;
-	//char *p = NULL;
 	/* Initialize the driver data */
 	INIT_LIST_HEAD(&gf_dev->device_entry);
 #if defined(USE_SPI_BUS)
@@ -814,15 +800,9 @@ static int gf_probe(struct platform_device *pdev)
 #ifndef GOODIX_DRM_INTERFACE_WA
 	INIT_WORK(&gf_dev->work, notification_work);
 #endif
-	//p = strstr(fingerprint_sensor, "gdx");
-	if (fpsensor == 1) {
-  		pr_err("This is goodix fingerprint\n");
-          	pr_err("fpsensor is %d\n", fpsensor);
-  	} else {
-		pr_err("gf_probe failed as goodix\n");
-          	pr_err("fpsensor is %d\n", fpsensor);
-		return -1;
-	}
+
+	// print msg if goodix module successfully loaded.
+	pr_info("Successfully loaded goodix fingerprint module\n");
 	//int rc = 0;
 	/*get pwr resource */
 	/*
@@ -1014,12 +994,6 @@ static int __init gf_init(void)
 	 * that will key udev/mdev to add/remove /dev nodes.  Last, register
 	 * the driver which manages those device numbers.
 	 */
-/*
-	if (fpsensor != 2) {
-		pr_err(" hml gf_init failed as fpsensor = %d(2=gdx)\n", fpsensor);
-		return -1;
-	}
-*/
 	BUILD_BUG_ON(N_SPI_MINORS > 256);
 	status = register_chrdev(SPIDEV_MAJOR, CHRD_DRIVER_NAME, &gf_fops);
 	if (status < 0) {

@@ -57,26 +57,8 @@
 #define RELEASE_WAKELOCK "release_wakelock"
 #define START_IRQS_RECEIVED_CNT "start_irqs_received_counter"
 #define PROC_NAME "hwinfo"
-//extern char *saved_command_line;
-//EXPORT_SYMBOL(saved_command_line);
 static struct proc_dir_entry *proc_entry;
-//extern int fpsensor;
-//char fingerprintstr[30] = {0};
 
-int fpsensor = 0;
-module_param_named(fpsensor, fpsensor, int, 0644);
-MODULE_PARM_DESC(fpsensor, "fingerprint ic vendor");
-
-/*
-char fp_info[32] = {0};
-static int __init fingerprint_info(char *str)
-{
-    strcpy(fp_info, str);
-    pr_info("[fingerprint_info]This is fpc fingerprint\n");
-    return 1;
-}
-__setup("androidboot.fpsensor=", fingerprint_info);
-*/
 static const char * const pctl_names[] = {
 	"fpc1020_reset_reset",
 	"fpc1020_reset_active",
@@ -683,9 +665,7 @@ static int fpc1020_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	int rc = 0;
-	//int irqgpio = 2;
 	int vccgpio = 0;//added powered for plsensor
-	//char *p =NULL;//added 
 #ifndef CONFIG_FPC_COMPAT
 	size_t i;
 	int irqf;
@@ -700,18 +680,10 @@ static int fpc1020_probe(struct platform_device *pdev)
 		rc = -ENOMEM;
 		goto exit;
 	}
-	
-	//p = strstr(fingerprint_sensor, "fpc");
-  	
-	if (fpsensor == 2) {
-  		pr_err("This is fpc fingerprint\n");
-		dev_err(dev, "fpsensor is %d\n", fpsensor);
-  	} else {
-		pr_err("fpc1020_probe failed as fpsensor\n");
-		dev_err(dev, "fpsensor is %d\n", fpsensor);
-		return -1;
-	}
-	
+
+	// print msg if FPC module successfully loaded
+	pr_info("Successfully loaded FPC fingerprint module\n");
+
 	fpc1020->dev = dev;
 	platform_set_drvdata(pdev, fpc1020);
 
@@ -720,43 +692,7 @@ static int fpc1020_probe(struct platform_device *pdev)
 		rc = -EINVAL;
 		goto exit;
 	}
-  	/*
-	rc = fpc1020_request_named_gpio(fpc1020, "fpc,gpio_rst",
-			&fpc1020->rst_gpio);
-	if (rc)
-		goto exit;
-	rc = fpc1020_request_named_gpio(fpc1020, "fpc,gpio_irq",
-			&fpc1020->irq_gpio);
-	if (rc)
-		goto exit;
 
-	gpio_direction_input(fpc1020->irq_gpio);
-	gpio_direction_output(fpc1020->rst_gpio,1);
-
-	usleep_range(RESET_HIGH_SLEEP1_MIN_US, RESET_HIGH_SLEEP1_MAX_US);
-
-	gpio_set_value(fpc1020->rst_gpio,0);
-
-	usleep_range(RESET_LOW_SLEEP_MIN_US, RESET_LOW_SLEEP_MAX_US);
-
-	gpio_set_value(fpc1020->rst_gpio,1);
-	usleep_range(RESET_HIGH_SLEEP2_MIN_US, RESET_HIGH_SLEEP2_MAX_US);
-
-	irqgpio = gpio_get_value(fpc1020->irq_gpio);
-	gpio_set_value(fpc1020->rst_gpio,0);//Fix goodix power-on sequence problem
-	dev_info(dev, "IRQ value after reset is %d\n", irqgpio);
-	if (irqgpio == 0) {
-		dev_info(dev, "IRQ value after reset is %d so there is goodix fingerprint and return\n", irqgpio);
-		goto err_fp;
-	}
-        */
-	//add powered for plsensor
-	/*
-	rc = fpc1020_request_named_gpio(fpc1020, "fpc,gpio_vdd_for_plsensor",
-			&vccgpio);
-	if (rc)
-		goto exit;
-	*/
 	rc = of_get_named_gpio(fpc1020->dev->of_node, "fpc,gpio_vdd_for_plsensor", 0);
 	vccgpio = rc;
 	if (rc < 0) {
