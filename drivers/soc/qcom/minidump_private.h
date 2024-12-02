@@ -77,6 +77,10 @@ struct md_global_toc {
 	struct md_ss_toc	md_ss_toc[MAX_NUM_OF_SS];
 };
 
+#if IS_ENABLED(CONFIG_QCOM_MINIDUMP_LAST_KMSG)
+int last_kmsg_driver_init(void);
+#endif
+
 int msm_minidump_log_init(void);
 
 #endif
