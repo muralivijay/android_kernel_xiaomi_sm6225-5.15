@@ -989,24 +989,32 @@ static int adsp_probe(struct platform_device *pdev)
 	int ret;
 	bool signal_aop;
 
-	desc = of_device_get_match_data(&pdev->dev);
-	if (!desc)
-		return -EINVAL;
+	dev_info(&pdev->dev, "Enter qcom_q6v5_pas probe\n");
 
-	if (!qcom_scm_is_available())
+	desc = of_device_get_match_data(&pdev->dev);
+	if (!desc) {
+		dev_err(&pdev->dev, "Failed to get device_get_match_data\n");
+		return -EINVAL;
+	}
+
+	if (!qcom_scm_is_available()) {
+		dev_err(&pdev->dev, "qcom_scm_is_available is not available defer probe\n");
 		return -EPROBE_DEFER;
+	}
 
 	fw_name = desc->firmware_name;
 	ret = of_property_read_string(pdev->dev.of_node, "firmware-name",
 				      &fw_name);
-	if (ret < 0 && ret != -EINVAL)
+	if (ret < 0 && ret != -EINVAL) {
+		dev_err(&pdev->dev, "firmware-name not found ret=%d\n", ret);
 		return ret;
+	}
 
 	if (desc->needs_dsm_mem_setup && !mpss_dsm_mem_setup &&
 			!strcmp(fw_name, "modem.mdt")) {
 		ret = setup_mpss_dsm_mem(pdev);
 		if (ret) {
-			dev_err(&pdev->dev, "failed to setup mpss dsm mem\n");
+			dev_err(&pdev->dev, "failed to setup mpss dsm mem ret=%d\n", ret);
 			return -EINVAL;
 		}
 	}
@@ -1046,44 +1054,61 @@ static int adsp_probe(struct platform_device *pdev)
 	}
 	platform_set_drvdata(pdev, adsp);
 
+	dev_info(&pdev->dev, "Platform driver data set successfully\n");
+
 	ret = device_init_wakeup(adsp->dev, true);
-	if (ret)
+	if (ret) {
+		dev_err(&pdev->dev,  "device init wakeup failed ret=%d\n", ret);
 		goto free_rproc;
+	}
 
 	ret = adsp_alloc_memory_region(adsp);
-	if (ret)
+	if (ret) {
+		dev_err(&pdev->dev,  "adsp allocation memory region failed ret=%d\n", ret);
 		goto deinit_wakeup_source;
+	}
 
 	ret = adsp_setup_32b_dma_allocs(adsp);
-	if (ret)
+	if (ret) {
+		dev_err(&pdev->dev,  "adsp setup 32b dma allocation failed ret=%d\n", ret);
 		goto deinit_wakeup_source;
+	}
 
 	ret = adsp_init_clock(adsp);
-	if (ret)
+	if (ret) {
+		dev_err(&pdev->dev,  "adsp init clock failed ret=%d\n", ret);
 		goto deinit_wakeup_source;
+	}
 
 	ret = adsp_init_regulator(adsp);
-	if (ret)
+	if (ret) {
+		dev_err(&pdev->dev,  "adsp init regulator failed ret=%d\n", ret);
 		goto deinit_wakeup_source;
+	}
 
 	adsp_init_bus_scaling(adsp);
 
 	ret = adsp_pds_attach(&pdev->dev, adsp->active_pds,
 			      desc->active_pd_names);
-	if (ret < 0)
+	if (ret < 0) {
+		dev_err(&pdev->dev,  "adsp pds active_pds attach failed ret =%d\n", ret);
 		goto deinit_wakeup_source;
 	adsp->active_pd_count = ret;
+	}
 
 	ret = adsp_pds_attach(&pdev->dev, adsp->proxy_pds,
 			      desc->proxy_pd_names);
-	if (ret < 0)
+	if (ret < 0) {
+		dev_err(&pdev->dev,  "adsp pds proxy_pds attach failed ret=%d\n", ret);
 		goto detach_active_pds;
 	adsp->proxy_pd_count = ret;
+	}
 
 	signal_aop = of_property_read_bool(pdev->dev.of_node,
 			"qcom,signal-aop");
 
 	if (signal_aop) {
+		dev_err(&pdev->dev,  "qcom,signal-aop property read failed from devicetree\n");
 		adsp->qmp = qmp_get(adsp->dev);
 		if (IS_ERR_OR_NULL(adsp->qmp))
 			goto detach_proxy_pds;
@@ -1092,8 +1117,10 @@ static int adsp_probe(struct platform_device *pdev)
 	ret = qcom_q6v5_init(&adsp->q6v5, pdev, rproc, desc->crash_reason_smem,
 			     qcom_pas_handover);
 
-	if (ret)
+	if (ret) {
+		dev_err(&pdev->dev,  "qcom_q6v5_init failed ret=%d\n", ret);
 		goto detach_proxy_pds;
+	}
 
 	qcom_q6v5_register_ssr_subdev(&adsp->q6v5, &adsp->ssr_subdev.subdev);
 
@@ -1108,24 +1135,31 @@ static int adsp_probe(struct platform_device *pdev)
 					      desc->sysmon_name,
 					      desc->ssctl_id);
 	if (IS_ERR(adsp->sysmon)) {
+			dev_err(&pdev->dev,  "error from sysmon\n");
 		ret = PTR_ERR(adsp->sysmon);
 		goto detach_proxy_pds;
 	}
 
 	qcom_add_ssr_subdev(rproc, &adsp->ssr_subdev, desc->ssr_name);
 	ret = device_create_file(adsp->dev, &dev_attr_txn_id);
-	if (ret)
+	if (ret) {
+		dev_err(&pdev->dev,  "failed to create device file ret=%d\n", ret);
 		goto remove_subdevs;
+	}
 
 	snprintf(md_dev_name, ARRAY_SIZE(md_dev_name), "%s-md", pdev->dev.of_node->name);
 	adsp->minidump_dev = qcom_create_ramdump_device(md_dev_name, NULL);
-	if (!adsp->minidump_dev)
+	if (!adsp->minidump_dev) {
 		dev_err(&pdev->dev, "Unable to create %s minidump device.\n", md_dev_name);
+	}
 
 	ret = rproc_add(rproc);
-	if (ret)
+	if (ret) {
+		dev_err(&pdev->dev,  "rproc add failed ret=%d\n", ret);
 		goto destroy_minidump_dev;
+	}
 
+	dev_info(&pdev->dev, "Successful qcom_q6v5_pas probe\n");
 	return 0;
 
 destroy_minidump_dev:
