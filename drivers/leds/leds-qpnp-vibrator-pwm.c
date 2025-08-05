@@ -42,9 +42,7 @@ struct vib_pwm_chip {
 	struct led_classdev	cdev;
 	struct regmap		*regmap;
 	struct mutex		lock;
-	struct hrtimer		stop_timer;
 	//struct hrtimer		overdrive_timer;
-	struct work_struct	vib_work;
 	//struct work_struct	overdrive_work;
 
 	u16			base;
@@ -147,51 +145,6 @@ static int qpnp_vibrator_play_off(struct vib_pwm_chip *chip)
 
 }
 
-static void qpnp_vib_work(struct work_struct *work)
-{
-	struct vib_pwm_chip *chip = container_of(work, struct vib_pwm_chip,
-						vib_work);
-	int ret = 0;
-	int en_time = 0;
-
-	if (chip->state) {
-		if (!chip->vib_enabled) {
-			ret = qpnp_vibrator_play_on(chip);
-			printk("vib--111-ret=%d\n", ret);
-		}
-		if (ret == 0) {
-			if (chip->effect_idx == 1) {
-				en_time = 35;
-			} else if (chip->effect_idx == 2) {
-				en_time = 50;
-			} else if (chip->effect_idx == 3) {
-				en_time = 60;
-			} else {
-				en_time = chip->vib_play_ms;
-			}
-                        printk("vib--qpnp_vib_work-chip->effect_idx=%d en_time=%d \n", chip->effect_idx, en_time);
-			hrtimer_start(&chip->stop_timer,
-				      ms_to_ktime(en_time),
-				      HRTIMER_MODE_REL);
-			printk("vib-qpnp_vib_work--en_time=%d   end\n", en_time);	  
-		}
-	} else {
-		ret = qpnp_vibrator_play_off(chip);
-		//printk("vib--222-ret=%d\n", ret);
-	}
-}
-
-
-static enum hrtimer_restart vib_stop_timer(struct hrtimer *timer)
-{
-	struct vib_pwm_chip *chip = container_of(timer, struct vib_pwm_chip,
-					     stop_timer);
-
-	chip->state = 0;
-	//printk("vib---vib_stop_timer\n");
-	schedule_work(&chip->vib_work);
-	return HRTIMER_NORESTART;
-}
 /*
 static enum hrtimer_restart vib_overdrive_timer(struct hrtimer *timer)
 {
@@ -202,22 +155,6 @@ static enum hrtimer_restart vib_overdrive_timer(struct hrtimer *timer)
 	return HRTIMER_NORESTART;
 }
 */
-static ssize_t qpnp_vib_show_state(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	struct led_classdev *cdev = dev_get_drvdata(dev);
-	struct vib_pwm_chip *chip = container_of(cdev, struct vib_pwm_chip,
-						cdev);
-	printk("vib---qpnp_vib_show_state\n");
-	return snprintf(buf, PAGE_SIZE, "%d\n", chip->vib_enabled);
-}
-
-static ssize_t qpnp_vib_store_state(struct device *dev,
-		struct device_attribute *attr, const char *buf, size_t count)
-{
-	/* At present, nothing to do with setting state */
-	return count;
-}
 
 static ssize_t qpnp_vib_show_effect(struct device *dev,
 		struct device_attribute *attr, char *buf)
@@ -236,109 +173,41 @@ static ssize_t qpnp_vib_store_effect(struct device *dev,
 	return count;
 }
 
-static ssize_t qpnp_vib_show_duration(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	struct led_classdev *cdev = dev_get_drvdata(dev);
-	struct vib_pwm_chip *chip = container_of(cdev, struct vib_pwm_chip,
-						cdev);
-	ktime_t time_rem;
-	s64 time_ms = 0;
+static struct device_attribute qpnp_vib_attrs = 
+	__ATTR(effect, 0664, qpnp_vib_show_effect, qpnp_vib_store_effect);
 
-	if (hrtimer_active(&chip->stop_timer)) {
-		time_rem = hrtimer_get_remaining(&chip->stop_timer);
-		time_ms = ktime_to_ms(time_rem);
-	}
-	printk("vib---qpnp_vib_show_duration\n");
-	return snprintf(buf, PAGE_SIZE, "%lld\n", time_ms);
-}
 
-static ssize_t qpnp_vib_store_duration(struct device *dev,
-		struct device_attribute *attr, const char *buf, size_t count)
-{
-	struct led_classdev *cdev = dev_get_drvdata(dev);
-	struct vib_pwm_chip *chip = container_of(cdev, struct vib_pwm_chip,
-						cdev);
-	u32 val;
-	int ret;
-
-	ret = kstrtouint(buf, 0, &val);
-	if (ret < 0)
-		return ret;
-
-	/* setting 0 on duration is NOP for now */
-	if (val <= 0)
-		return count;
-
-	printk("vib---qpnp_vib_store_duration---val=%d\n", val);
-	mutex_lock(&chip->lock);
-	if (val < 20) {
-		chip->effect_idx = 0; //short vib 1
-	} else if (val >= 21 && val < 44) {
-		chip->effect_idx = 0; //short vib 2
-	} else if (val >= 44 && val < 50) {
-		chip->effect_idx = 0; //short vib 3
-	} else {
-		chip->effect_idx = 0; //long vib
-	}
-	//en_time = 35;
-	printk("vib---qpnp_vib_store_duration  chip->effect_idx=%d  val=%d \n", chip->effect_idx, val);
-	chip->vib_play_ms = val;
-	mutex_unlock(&chip->lock);
-
-	return count;
-}
-
-static ssize_t qpnp_vib_show_activate(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	/* For now nothing to show */
-	printk("vib---qpnp_vib_show_activate\n");
-	return snprintf(buf, PAGE_SIZE, "%d\n", 0);
-}
-
-static ssize_t qpnp_vib_store_activate(struct device *dev,
-		struct device_attribute *attr, const char *buf, size_t count)
-{
-	struct led_classdev *cdev = dev_get_drvdata(dev);
-	struct vib_pwm_chip *chip = container_of(cdev, struct vib_pwm_chip,
-						cdev);
-	u32 val;
-	int ret;
-
-	ret = kstrtouint(buf, 0, &val);
-	if (ret < 0)
-		return ret;
-
-	if (val != 0 && val != 1)
-		return count;
-
-	mutex_lock(&chip->lock);
-	hrtimer_cancel(&chip->stop_timer);
-	chip->state = val;
-	printk("qpnp_vib_store_activate vib---state = %d, time = %llums\n", chip->state, chip->vib_play_ms);
-	mutex_unlock(&chip->lock);
-	schedule_work(&chip->vib_work);
-
-	return count;
-}
-
-static struct device_attribute qpnp_vib_attrs[] = {
-	__ATTR(state, 0664, qpnp_vib_show_state, qpnp_vib_store_state),
-	__ATTR(duration, 0664, qpnp_vib_show_duration, qpnp_vib_store_duration),
-	__ATTR(effect, 0664, qpnp_vib_show_effect, qpnp_vib_store_effect),
-	__ATTR(activate, 0664, qpnp_vib_show_activate, qpnp_vib_store_activate),
-};
-
-/* Dummy functions for brightness */
 static enum led_brightness qpnp_vib_brightness_get(struct led_classdev *cdev)
 {
-	return 0;
+	struct vib_pwm_chip *chip = container_of(cdev, struct vib_pwm_chip,
+						cdev);
+
+	return chip->state;
 }
 
 static void qpnp_vib_brightness_set(struct led_classdev *cdev,
 			enum led_brightness level)
 {
+	struct vib_pwm_chip *chip = container_of(cdev, struct vib_pwm_chip,
+						cdev);
+	int ret = 0;
+
+	chip->state = level;
+
+	if (chip->state) {
+		ret = qpnp_vibrator_play_on(chip);
+		if (ret < 0)
+			pr_err("set vibrator-on failed, ret=%d\n", ret);
+	} else {
+		/*
+		if (!chip->disable_overdrive) {
+			hrtimer_cancel(&chip->overdrive_timer);
+			cancel_work_sync(&chip->overdrive_work);
+		}*/
+		ret = qpnp_vibrator_play_off(chip);
+	}
+
+	pr_debug("vibrator state=%d\n", chip->state);
 }
 
 static int qpnp_vibrator_pwm_suspend(struct device *dev)
@@ -352,8 +221,6 @@ static int qpnp_vibrator_pwm_suspend(struct device *dev)
 		hrtimer_cancel(&chip->overdrive_timer);
 		//cancel_work_sync(&chip->overdrive_work);
 	}*/
-	hrtimer_cancel(&chip->stop_timer);
-	cancel_work_sync(&chip->vib_work);
 	qpnp_vibrator_play_off(chip);
 	mutex_unlock(&chip->lock);
 
@@ -402,7 +269,7 @@ static int qpnp_vib_parse_dt(struct vib_pwm_chip *chip)
 static int qpnp_vibrator_pwm_probe(struct platform_device *pdev)
 {
 	struct vib_pwm_chip *chip;
-	int i, ret;
+	int ret;
 	u32 base = 0;
 
 	printk("vib---wj---qpnp_vibrator_pwm_probe\n");
@@ -422,11 +289,8 @@ static int qpnp_vibrator_pwm_probe(struct platform_device *pdev)
 	chip->base = (uint16_t)base;
 	chip->vib_play_ms = QPNP_VIB_PLAY_MS;
 	mutex_init(&chip->lock);
-	INIT_WORK(&chip->vib_work, qpnp_vib_work);
 	//INIT_WORK(&chip->overdrive_work, qpnp_vib_overdrive_work);
 
-	hrtimer_init(&chip->stop_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	chip->stop_timer.function = vib_stop_timer;
 	//hrtimer_init(&chip->overdrive_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	//chip->overdrive_timer.function = vib_overdrive_timer;
 	dev_set_drvdata(&pdev->dev, chip);
@@ -440,25 +304,22 @@ static int qpnp_vibrator_pwm_probe(struct platform_device *pdev)
 		printk("vib---Error in registering led class device, ret=%d\n", ret);
 		goto fail;
 	}
-
-	for (i = 0; i < ARRAY_SIZE(qpnp_vib_attrs); i++) {
-		ret = sysfs_create_file(&chip->cdev.dev->kobj,
-				&qpnp_vib_attrs[i].attr);
-		if (ret < 0) {
-			dev_err(&pdev->dev, "vib---Error in creating sysfs file, ret=%d\n",
-				ret);
-			goto sysfs_fail;
-		}
+	
+	ret = sysfs_create_file(&chip->cdev.dev->kobj,
+			&qpnp_vib_attrs.attr);
+	if (ret < 0) {
+		dev_err(&pdev->dev, "vib---Error in creating sysfs file, ret=%d\n",
+			ret);
+		goto sysfs_fail;
 	}
-
+	
 	//printk("vib---Vibrator PWM successfully registered: overdrive = %s\n",
 	//	chip->disable_overdrive ? "disabled" : "enabled");
 	return 0;
 
 sysfs_fail:
-	for (--i; i >= 0; i--)
-		sysfs_remove_file(&chip->cdev.dev->kobj,
-				&qpnp_vib_attrs[i].attr);
+	sysfs_remove_file(&chip->cdev.dev->kobj,
+			&qpnp_vib_attrs.attr);
 fail:
 	mutex_destroy(&chip->lock);
 	dev_set_drvdata(&pdev->dev, NULL);
@@ -475,8 +336,6 @@ static int qpnp_vibrator_pwm_remove(struct platform_device *pdev)
 		hrtimer_cancel(&chip->overdrive_timer);
 		//cancel_work_sync(&chip->overdrive_work);
 	}*/
-	hrtimer_cancel(&chip->stop_timer);
-	cancel_work_sync(&chip->vib_work);
 	mutex_destroy(&chip->lock);
 	dev_set_drvdata(&pdev->dev, NULL);
 
