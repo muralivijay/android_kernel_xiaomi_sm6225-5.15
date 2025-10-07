@@ -1,0 +1,1 @@
+../../../../sm6225-modules/qcom/opensource/camera-kernel/include/uapi/camera/media/cam_sync.h
